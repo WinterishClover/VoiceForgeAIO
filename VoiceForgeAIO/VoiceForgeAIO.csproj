@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>VoiceForgeAIO</RootNamespace>
+    <AssemblyName>VoiceForgeAIO</AssemblyName>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- icon.ico serves two purposes: ApplicationIcon above embeds it into the
+       compiled exe itself (what File Explorer/taskbar-pin/shortcuts show before
+       the app is even running); this ItemGroup copies the same file next to the
+       exe at runtime so Program.cs can point Photino's window IconFile at it
+       (the title bar/taskbar icon while the app is actually open). -->
+  <ItemGroup>
+    <None Include="icon.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Three NuGet dependencies now: DPAPI encryption for saved API keys, NAudio
+       for WAV resampling, and Photino.NET for the web-UI-based window (real
+       HTML/CSS/JS rendered through the OS's native WebView2 control; no bundled
+       Chromium, unlike Electron). All three restore automatically the first time
+       you build/open this in Visual Studio, given an internet connection.
+       Photino.NET requires the WebView2 runtime, which ships with Windows 10/11
+       by default in most cases; if it's ever missing, get it from
+       https://developer.microsoft.com/microsoft-edge/webview2/ -->
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="Photino.NET" Version="4.0.16" />
+  </ItemGroup>
+
+  <!-- Ship the web UI assets alongside the exe. -->
+  <ItemGroup>
+    <None Include="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

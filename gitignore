@@ -1,0 +1,26 @@
+# Build output
+bin/
+obj/
+publish/
+installer_output/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Never commit anything that looks like local settings/secrets, even though
+# real settings live in %AppData% and never sit in the repo folder itself --
+# this is just a safety net in case a test copy ever ends up here by accident.
+settings.json
+voice_map.json
+appsettings.local.json
+*.pfx
+*.key
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Inno Setup output / redistributables (third-party binaries -- not ours to redistribute)
+installer/redist/

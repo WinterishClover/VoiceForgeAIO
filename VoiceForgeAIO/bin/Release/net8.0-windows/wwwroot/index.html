@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>VoiceForge AIO</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ===================== Splash (first launch only) ===================== -->
+  <div id="splash-overlay">
+    <div class="splash-card">
+      <div class="splash-mark">VOICEFORGE <span class="accent">AIO</span></div>
+      <div class="splash-tagline">Multi-provider TTS + LIP/FUZ pipeline for Skyrim modding</div>
+      <div class="splash-body">
+        Generate voiced dialogue across six TTS providers, build matching
+        <strong>.lip</strong> files, and package everything into Bethesda's
+        <strong>.fuz</strong> format &mdash; all from one place.
+      </div>
+      <button id="splash-continue-btn">Get Started</button>
+    </div>
+  </div>
+
+  <div id="app">
+    <!-- ===================== Top menu bar ===================== -->
+    <header class="topbar">
+      <div class="topbar-brand">
+        <span class="brand-icon">&#9835;</span>
+        <span class="brand-word">VOICEFORGE<span class="accent"> AIO</span></span>
+      </div>
+      <nav class="topbar-menu">
+        <button class="topbar-btn" data-open-modal="settings-modal-overlay">Settings</button>
+        <button class="topbar-btn" data-open-modal="help-modal-overlay">Help</button>
+        <button class="topbar-btn" data-open-modal="about-modal-overlay">About</button>
+      </nav>
+    </header>
+
+    <div class="workspace">
+      <!-- ===================== Sidebar nav ===================== -->
+      <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Collapse">&#8249;</button>
+        <nav class="sidebar-nav">
+          <button class="nav-item active" data-page="voice-mapping-page" title="Voice Mapping">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h6M3 12l3-3M3 12l3 3M21 12h-6M21 12l-3-3M21 12l-3 3"/><circle cx="12" cy="12" r="2.4"/></svg>
+            <span class="nav-label">Voice Mapping</span>
+          </button>
+          <button class="nav-item" data-page="single-line-page" title="Single-Line Generate">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/></svg>
+            <span class="nav-label">Single-Line Generate</span>
+          </button>
+          <button class="nav-item" data-page="batch-page" title="CSV Batch Generate">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16M13 13h5M13 17h5"/></svg>
+            <span class="nav-label">CSV Batch Generate</span>
+          </button>
+        </nav>
+      </aside>
+
+      <!-- ===================== Main content pages ===================== -->
+      <main class="content-area" id="content-area">
+
+        <!-- ---- Voice Mapping page ---- -->
+        <section class="page active" id="voice-mapping-page">
+          <div class="page-header">
+            <h2>Voice Mapping</h2>
+            <span class="page-subtitle">VoiceType &rarr; Provider + Voice</span>
+            <span class="badge" id="voice-count-badge">No voices loaded yet</span>
+          </div>
+
+          <div class="button-bar" style="margin-bottom:14px;">
+            <button id="refresh-voices-btn">Get Available Voices</button>
+          </div>
+
+          <div class="grid-scroll grid-scroll-tall">
+            <table class="grid" id="voice-map-table">
+              <thead>
+                <tr>
+                  <th style="width:32%;">VoiceType (Skyrim folder name)</th>
+                  <th style="width:24%;">Provider</th>
+                  <th>Voice</th>
+                </tr>
+              </thead>
+              <tbody id="voice-map-body"></tbody>
+            </table>
+          </div>
+
+          <div class="button-bar">
+            <button class="secondary" id="add-row-btn">Add Row</button>
+            <button class="secondary" id="remove-row-btn">Remove Selected</button>
+            <button id="save-mapping-btn">Save Mapping</button>
+            <button class="secondary" id="export-csv-btn">Export CSV</button>
+            <button class="secondary" id="import-csv-btn">Import CSV</button>
+          </div>
+        </section>
+
+        <!-- ---- Single-Line Generate page ---- -->
+        <section class="page" id="single-line-page">
+          <div class="page-header">
+            <h2>Single-Line Generate</h2>
+            <span class="page-subtitle">Quick one-off test lines</span>
+          </div>
+
+          <div class="card-body-plain" style="max-width: 720px;">
+            <label class="field-label" for="single-text">Enter Text</label>
+            <textarea id="single-text" rows="4"></textarea>
+
+            <div class="field-row" style="margin-top:12px;">
+              <div class="grow">
+                <label class="field-label" for="single-provider">Provider</label>
+                <select id="single-provider"></select>
+              </div>
+              <div class="grow">
+                <label class="field-label" for="single-model">Model</label>
+                <select id="single-model"></select>
+              </div>
+            </div>
+
+            <label class="field-label" for="single-voice">Voice</label>
+            <select id="single-voice" style="margin-bottom:12px;"></select>
+
+            <div class="field-row">
+              <div class="grow">
+                <label class="field-label" for="single-output-path">Output Path</label>
+                <input type="text" id="single-output-path" />
+              </div>
+              <div class="fixed"><button class="secondary" data-browse-folder="single-output-path">Browse&hellip;</button></div>
+            </div>
+
+            <div class="field-row">
+              <div class="grow">
+                <label class="field-label" for="single-filename">Filename</label>
+                <input type="text" id="single-filename" placeholder="line1.wav" />
+              </div>
+              <div class="fixed"><button id="generate-single-btn">Generate Audio</button></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---- CSV Batch Generate page ---- -->
+        <section class="page" id="batch-page">
+          <div class="page-header">
+            <h2>CSV Batch Generate</h2>
+            <span class="page-subtitle">Bulk voice line generation with LIP/FUZ pipeline</span>
+          </div>
+
+          <div class="card-body-plain" style="max-width: 760px;">
+            <div class="field-row">
+              <div class="grow">
+                <label class="field-label" for="batch-csv-path">CSV File</label>
+                <input type="text" id="batch-csv-path" />
+              </div>
+              <div class="fixed"><button class="secondary" data-browse-file="batch-csv-path" data-filter-name="CSV files" data-filter-ext="csv">Browse&hellip;</button></div>
+            </div>
+
+            <div class="field-row">
+              <div class="grow">
+                <label class="field-label" for="batch-voice-folder">Mod Voice Folder</label>
+                <input type="text" id="batch-voice-folder" />
+              </div>
+              <div class="fixed"><button class="secondary" data-browse-folder="batch-voice-folder">Browse&hellip;</button></div>
+            </div>
+            <div class="field-hint">e.g. .../Data/Sound/Voice/YourMod.esp &mdash; VoiceType subfolders are created under this automatically.</div>
+
+            <div class="field-row" style="margin-top:12px; max-width: 220px;">
+              <div class="grow">
+                <label class="field-label" for="batch-concurrency">Concurrency</label>
+                <input type="number" id="batch-concurrency" min="1" max="10" value="3" />
+              </div>
+            </div>
+
+            <div class="checkbox-row">
+              <input type="checkbox" id="batch-overwrite" />
+              <label for="batch-overwrite">Overwrite existing files</label>
+            </div>
+            <div class="checkbox-row">
+              <input type="checkbox" id="batch-lip" />
+              <label for="batch-lip">Generate .lip files (requires FaceFXWrapper + FonixData.cdf in Settings)</label>
+            </div>
+            <div class="checkbox-row disabled" id="batch-fuz-row">
+              <input type="checkbox" id="batch-fuz" disabled />
+              <label for="batch-fuz">Generate .fuz files (requires .lip above + xWMAEncode/LipFuzer in Settings)</label>
+            </div>
+
+            <div class="button-bar">
+              <button id="start-batch-btn">CSV Batch Generate</button>
+              <button class="secondary" id="pause-batch-btn" disabled>Pause</button>
+              <button class="danger" id="stop-batch-btn" disabled>Stop Batch</button>
+            </div>
+
+            <div style="margin-top: 14px;">
+              <div class="progress-bar-track"><div class="progress-bar-fill" id="batch-progress-fill"></div></div>
+              <div class="progress-label" id="batch-progress-label">Progress: 0/0</div>
+            </div>
+
+            <div class="field-hint" style="margin-top:12px;">CSV format (no header): EditorID,VoiceType,"Line text"</div>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- ===================== Resizer + Log panel ===================== -->
+      <div class="resizer" id="log-resizer"></div>
+
+      <aside id="log-panel">
+        <div class="log-header">LOG</div>
+        <div id="log-output"></div>
+        <div class="log-footer">
+          <button class="secondary" id="save-log-btn">Save Log</button>
+          <button class="secondary" id="clear-log-btn">Clear Log</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ===================== Settings modal ===================== -->
+  <div class="modal-overlay" id="settings-modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Settings</h3>
+        <button class="modal-close" data-close-modal="settings-modal-overlay">&times;</button>
+      </div>
+      <div class="modal-body">
+        <h4 class="modal-section-title">Provider API Keys</h4>
+        <div id="provider-key-rows"></div>
+
+        <div class="checkbox-row">
+          <input type="checkbox" id="show-keys-toggle" />
+          <label for="show-keys-toggle">Show keys</label>
+        </div>
+
+        <hr class="modal-divider" />
+
+        <h4 class="modal-section-title">LIP Generation</h4>
+        <div class="field-row">
+          <div class="grow">
+            <label class="field-label" for="facefx-path">FaceFXWrapper.exe</label>
+            <input type="text" id="facefx-path" placeholder="Path to FaceFXWrapper.exe" />
+          </div>
+          <div class="fixed"><button class="secondary" data-browse-file="facefx-path" data-filter-name="FaceFXWrapper.exe" data-filter-ext="exe">Browse&hellip;</button></div>
+        </div>
+        <div class="field-row">
+          <div class="grow">
+            <label class="field-label" for="fonixdata-path">FonixData.cdf</label>
+            <input type="text" id="fonixdata-path" placeholder="Path to FonixData.cdf" />
+          </div>
+          <div class="fixed"><button class="secondary" data-browse-file="fonixdata-path" data-filter-name="FonixData.cdf" data-filter-ext="cdf">Browse&hellip;</button></div>
+        </div>
+        <div class="field-hint">Typically under Skyrim SE's Tools\LipGen\LipGenerator, or from the Creation Kit. Not bundled.</div>
+
+        <h4 class="modal-section-title" style="margin-top:16px;">FUZ Generation</h4>
+        <div class="field-row">
+          <div class="grow">
+            <label class="field-label" for="xwma-path">xWMAEncode.exe</label>
+            <input type="text" id="xwma-path" placeholder="Path to xWMAEncode.exe" />
+          </div>
+          <div class="fixed"><button class="secondary" data-browse-file="xwma-path" data-filter-name="xWMAEncode.exe" data-filter-ext="exe">Browse&hellip;</button></div>
+        </div>
+        <div class="field-row">
+          <div class="grow">
+            <label class="field-label" for="lipfuzer-path">LipFuzer.exe</label>
+            <input type="text" id="lipfuzer-path" placeholder="Path to LipFuzer.exe" />
+          </div>
+          <div class="fixed"><button class="secondary" data-browse-file="lipfuzer-path" data-filter-name="LipFuzer.exe" data-filter-ext="exe">Browse&hellip;</button></div>
+        </div>
+        <div class="field-hint">Both needed only for "Generate .fuz files" &mdash; also found under Skyrim SE's Tools\LipGen. Not bundled.</div>
+      </div>
+      <div class="modal-footer">
+        <button id="save-settings-btn">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== Help modal ===================== -->
+  <div class="modal-overlay" id="help-modal-overlay">
+    <div class="modal modal-large">
+      <div class="modal-header">
+        <h3>Help &amp; Getting Started</h3>
+        <button class="modal-close" data-close-modal="help-modal-overlay">&times;</button>
+      </div>
+      <div class="modal-body help-content">
+
+        <h4>What this tool does</h4>
+        <p>VoiceForge AIO turns a spreadsheet of dialogue lines into finished Skyrim
+          voice assets. Point it at a CSV of lines, tell it which TTS voice each
+          character uses, and it generates the audio &mdash; optionally also building
+          the <strong>.lip</strong> file for facial animation and packaging
+          everything into Bethesda's <strong>.fuz</strong> format, ready to drop
+          straight into your mod's <code>Sound\Voice</code> folder.</p>
+
+        <h4>1. Add your API keys</h4>
+        <p>Open <strong>Settings</strong> from the top menu and paste in the API
+          key for whichever provider(s) you plan to use &mdash; you don't need all
+          six, just the ones you're actually using. MiniMax additionally needs a
+          <strong>Group ID</strong> from its dashboard, separate from the API key.
+          Click <strong>Show keys</strong> if you want to double-check what you
+          typed, then <strong>Save Settings</strong>.</p>
+
+        <h4>2. Build your Voice Mapping</h4>
+        <p>This is the heart of the tool: it tells VoiceForge AIO which actual
+          provider voice to use for each character. Skyrim VoiceType names
+          (like "Kaylin" or "Eldis") don't mean anything to a TTS provider, so
+          you map each one once:</p>
+        <ol>
+          <li>Click <strong>Get Available Voices</strong> &mdash; this pulls the full
+            voice list from every provider you've added a key for.</li>
+          <li>Click <strong>Add Row</strong>, type the VoiceType name (must match
+            your CSV's VoiceType column exactly), pick a <strong>Provider</strong>,
+            then pick the <strong>Voice</strong> for it.</li>
+          <li>Repeat for every character, then click <strong>Save Mapping</strong>.
+            This is saved permanently &mdash; you only do this once per character,
+            ever.</li>
+        </ol>
+        <p>You can also <strong>Export CSV</strong> to share a mapping with someone
+          else working on the same mod, or <strong>Import CSV</strong> to load one
+          they sent you.</p>
+
+        <h4>3. Try a line with Single-Line Generate</h4>
+        <p>Good for quickly testing a voice before committing to a full batch.
+          Pick a provider, model, and voice, type some text, choose where to save
+          it, and click <strong>Generate Audio</strong>.</p>
+
+        <h4>4. Run a full batch</h4>
+        <p>Your CSV needs exactly three columns, no header row:</p>
+        <pre>EditorID,VoiceType,"Line text"</pre>
+        <p>Point <strong>CSV Batch Generate</strong> at that file and at your mod's
+          Voice folder (e.g. <code>...\Data\Sound\Voice\YourMod.esp</code>) &mdash;
+          VoiceForge AIO creates a subfolder per VoiceType automatically. Already-
+          generated files are skipped on a re-run unless you check
+          <strong>Overwrite existing files</strong>, so it's always safe to stop
+          and resume a batch.</p>
+
+        <h4>5. LIP and FUZ generation (optional)</h4>
+        <p>Check <strong>Generate .lip files</strong> to also build facial
+          animation data for each line &mdash; this needs <strong>FaceFXWrapper.exe</strong>
+          and <strong>FonixData.cdf</strong> set in Settings first (neither is
+          bundled; FonixData.cdf usually lives under Skyrim SE's
+          <code>Tools\LipGen\LipGenerator</code> folder, or comes from the
+          Creation Kit).</p>
+        <p>Once LIP is on, <strong>Generate .fuz files</strong> becomes available
+          &mdash; this packages the WAV and LIP together into Skyrim's native
+          <code>.fuz</code> format, using <strong>xWMAEncode.exe</strong> and
+          <strong>LipFuzer.exe</strong> (also set in Settings). A .fuz needs both
+          a WAV and a LIP to exist, which is why this option stays locked until
+          LIP generation is checked.</p>
+
+        <h4>Troubleshooting tips</h4>
+        <ul>
+          <li><strong>A provider fails with a rate-limit error:</strong> lower the
+            Concurrency setting in CSV Batch Generate, or just re-run the batch
+            &mdash; already-completed lines are skipped automatically.</li>
+          <li><strong>LIP generation fails to open a file:</strong> this is
+            usually antivirus briefly locking a freshly-written WAV; the tool
+            already retries automatically, but if it persists, try adding an
+            antivirus exclusion for your mod's output folder.</li>
+          <li><strong>A voice doesn't show up after Get Available Voices:</strong>
+            double-check the API key for that provider is saved in Settings, and
+            that the key has the right permissions on the provider's dashboard.</li>
+          <li><strong>Check the log panel</strong> on the right &mdash; every
+            operation reports there, including the exact error text from
+            whichever provider or tool failed.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== About modal ===================== -->
+  <div class="modal-overlay" id="about-modal-overlay">
+    <div class="modal modal-small">
+      <div class="modal-header">
+        <h3>About</h3>
+        <button class="modal-close" data-close-modal="about-modal-overlay">&times;</button>
+      </div>
+      <div class="modal-body" style="text-align:center;">
+        <div class="about-mark">VOICEFORGE <span class="accent">AIO</span></div>
+        <p class="about-tagline">Multi-provider TTS + LIP/FUZ pipeline for Skyrim modding</p>
+        <p>Built for the Skyrim modding community by <strong>WinterishClover</strong>,
+          creator of Become High King of Skyrim &mdash; TNG.</p>
+        <button id="patreon-btn">&#9829; Support on Patreon</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="bridge.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
