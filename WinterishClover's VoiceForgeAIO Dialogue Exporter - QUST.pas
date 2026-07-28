@@ -5,6 +5,26 @@
   ready to drop straight into VoiceForge AIO's CSV Batch Generate, no manual
   merging needed.
 
+  v4.1: Added VNAM support for TACT (Talking Activator) records -- these
+  store their voice differently than NPC_ (VNAM vs VTCK). Also generalized
+  placed-reference resolution: previously only ACHR was resolved down to its
+  base object via NAME; now any placed reference (REFR included) is, which
+  matters because a quest alias's "Forced Reference" commonly points at a
+  generic REFR placed instance of a talking activator, not the TACT base
+  record itself.
+
+  v4.0: Fixed VoiceType resolution to always resolve through the actor's
+  ACTUAL assigned VoiceType (VTCK), never an actor's own EditorID -- the
+  previous version mixed "which actor is speaking" conditions (GetIsID) with
+  "what VoiceType" conditions (GetIsVoiceType) as if interchangeable, which
+  could give the same character two different values depending on which
+  condition happened to appear first on a given dialogue line. Also added
+  GetIsAliasRef handling (previously unhandled -> fell through to "Unknown"),
+  including alias-level Voice Type filters (VTYP) for voice-marker-style
+  aliases with no physical actor (e.g. a deity's dialogue marker). Any line
+  where resolution still has to fall back to a raw identity gets a "[!]"
+  warning printed to the message log for manual double-checking.
+
   v3.0: Combined output into a single CSV per quest with a VoiceType column
   (previously split into one file per speaker, with VoiceType only implied by
   filename). Also fixes response text with embedded quote characters not
@@ -63,116 +83,216 @@ begin
 end;
 
 //============================================================================
-procedure InfoVoiceTypes(Info: IInterface; lstVoice: TStringList);
+// Checks a record directly for its own voice-type field. NPC_ records store
+// this in VTCK; TACT (Talking Activator) records -- e.g. a quest's "voice of
+// Dagon" marker -- store it in VNAM instead. Returns '' if neither is found,
+// meaning Rec is likely a placed reference rather than a base record.
+function GetVoiceTypeFromRecord(Rec: IInterface): string;
 var
-  Conditions: IInterface;
-  i: integer;
-  Condition: IInterface;
-  ConditionFunction: string;
-  Elem: IInterface;
-  SpeakerName: string;
+  VoiceElem, VoiceType: IInterface;
 begin
-  lstVoice.Clear;
-  Conditions := ElementByName(Info, 'Conditions');
-  if Assigned(Conditions) then begin
-    for i := 0 to Pred(ElementCount(Conditions)) do begin
-      Condition := ElementByIndex(Conditions, i);
-      ConditionFunction := GetElementEditValues(Condition, 'CTDA\Function');
-      if ConditionFunction = 'GetIsID' then begin
-        Elem := LinksTo(ElementByPath(Condition, 'CTDA\Base Object'));
-        if not Assigned(Elem) then Elem := LinksTo(ElementByPath(Condition, 'CTDA\Parameter #1'));
-        if not Assigned(Elem) then Elem := LinksTo(ElementByPath(Condition, 'CTDA\Parameter #2'));
-        if Assigned(Elem) then begin
-          SpeakerName := EditorID(Elem);
-          if SpeakerName = '' then SpeakerName := Name(Elem);
-          lstVoice.Add(SpeakerName);
-        end;
-      end else if ConditionFunction = 'GetIsVoiceType' then begin
-        Elem := LinksTo(ElementByPath(Condition, 'CTDA\Voice Type'));
-        if Assigned(Elem) then begin
-          SpeakerName := EditorID(Elem);
-          if SpeakerName = '' then SpeakerName := Name(Elem);
-          lstVoice.Add(SpeakerName);
-        end;
-      end;
+  Result := '';
+  if not Assigned(Rec) then Exit;
+
+  VoiceElem := ElementByName(Rec, 'VTCK - Voice');
+  if not Assigned(VoiceElem) then VoiceElem := ElementByName(Rec, 'VTCK');
+  if not Assigned(VoiceElem) then VoiceElem := ElementByName(Rec, 'VNAM - Voice Type');
+  if not Assigned(VoiceElem) then VoiceElem := ElementByName(Rec, 'VNAM');
+
+  if Assigned(VoiceElem) then begin
+    VoiceType := LinksTo(VoiceElem);
+    if Assigned(VoiceType) then begin
+      Result := EditorID(VoiceType);
+      if Result = '' then Result := Name(VoiceType);
     end;
   end;
 end;
 
 //============================================================================
-function GetSpeakerName(Info: IInterface; QuestConditions: IInterface): string;
+// Resolves an actor-like record to the EditorID of its ACTUAL assigned
+// VoiceType, NOT its own EditorID. Handles two shapes:
+//   1. Rec is already a base record with its own voice field (NPC_'s VTCK,
+//      or TACT's VNAM) -- checked directly first.
+//   2. Rec is a placed reference (ACHR, REFR, ACRE, PGRE, etc. -- these all
+//      use the same "NAME" subrecord for their base object) pointing AT one
+//      of the above -- resolved via NAME and checked again. This is the
+//      common shape for a quest alias's "Forced Reference" pointing at a
+//      placed talking-activator marker rather than the TACT base itself.
+// Falls back to raw identity only if neither resolves, with a clear warning
+// printed so that line can be spot-checked by hand.
+function ResolveVoiceTypeForActor(ActorRec: IInterface): string;
 var
-  lstVoice: TStringList;
-  Speaker: IInterface;
-  Conditions, Condition, Elem: IInterface;
-  i: integer;
+  BaseRec: IInterface;
 begin
-  Result := 'Unknown';
-  lstVoice := TStringList.Create;
-  try
-    Speaker := ElementByName(Info, 'ANAM - Speaker');
-    if Assigned(Speaker) then begin
-      Speaker := LinksTo(Speaker);
-      if Assigned(Speaker) then begin
-        Result := EditorID(Speaker);
-        if Result = '' then Result := Name(Speaker);
-        Exit;
-      end;
-    end;
-    InfoVoiceTypes(Info, lstVoice);
-    if lstVoice.Count > 0 then begin
-      Result := lstVoice[0];
-      Exit;
-    end;
-    if Assigned(QuestConditions) then begin
-      for i := 0 to Pred(ElementCount(QuestConditions)) do begin
-        Condition := ElementByIndex(QuestConditions, i);
-        if GetElementEditValues(Condition, 'CTDA\Function') = 'GetIsID' then begin
-          Elem := LinksTo(ElementByPath(Condition, 'CTDA\Base Object'));
-          if Assigned(Elem) then begin
-            Result := EditorID(Elem);
-            if Result = '' then Result := Name(Elem);
-            Exit;
-          end;
-        end;
-      end;
-    end;
-  finally
-    lstVoice.Free;
-  end;
+  Result := '';
+  if not Assigned(ActorRec) then Exit;
+
+  Result := GetVoiceTypeFromRecord(ActorRec);
+  if Result <> '' then Exit;
+
+  BaseRec := LinksTo(ElementByPath(ActorRec, 'NAME'));
+  if Assigned(BaseRec) then begin
+    Result := GetVoiceTypeFromRecord(BaseRec);
+    if Result <> '' then Exit;
+  end else
+    BaseRec := ActorRec;
+
+  Result := EditorID(BaseRec);
+  if Result = '' then Result := Name(BaseRec);
+  if Result <> '' then
+    AddMessage('  [!] No VoiceType (VTCK/VNAM) found for "' + Result + '" -- used its EditorID as a fallback. Double-check this one.');
 end;
 
 //============================================================================
-// Resolve actor alias ID -> speaker name using quest alias list
-function GetAliasActorName(Quest: IInterface; AliasID: integer): string;
+// Resolves a quest alias ID to a VoiceType EditorID. Some aliases (e.g. a
+// deity's dialogue "voice marker") don't resolve to any physical actor at
+// all -- they carry a direct Voice Type filter (VTYP) on the alias itself,
+// which is checked FIRST since it's the most explicit, unambiguous source.
+// Otherwise, resolves whatever actor the alias points at and uses THAT
+// actor's real VTCK (never the alias's or actor's own name).
+function ResolveVoiceTypeForAlias(Quest: IInterface; AliasID: integer): string;
 var
-  AliasesEl, Alias, ActorRec: IInterface;
-  i: integer;
-  ThisID: integer;
+  AliasesEl, Alias, VoiceElem, VoiceType, ActorRec: IInterface;
+  i, ThisID: integer;
+  AliasName: string;
 begin
-  Result := 'Alias' + IntToStr(AliasID);
+  Result := '';
   AliasesEl := ElementByName(Quest, 'Aliases');
   if not Assigned(AliasesEl) then Exit;
+
   for i := 0 to Pred(ElementCount(AliasesEl)) do begin
     Alias := ElementByIndex(AliasesEl, i);
-ThisID := GetElementNativeValues(Alias, 'ALST - Reference Alias ID');
+    ThisID := GetElementNativeValues(Alias, 'ALST - Reference Alias ID');
     if ThisID = 0 then
       try ThisID := StrToInt(GetElementEditValues(Alias, 'ALST - Reference Alias ID')); except end;
     if ThisID <> AliasID then Continue;
-    // Try Unique Actor (ALUA)
+
+    // 1. Direct Voice Type filter on the alias itself (handles voice-marker-
+    //    style aliases with no physical actor, like the Dagon example).
+    VoiceElem := ElementByPath(Alias, 'VTYP - Voice Type');
+    if not Assigned(VoiceElem) then VoiceElem := ElementByPath(Alias, 'VTYP');
+    if Assigned(VoiceElem) then begin
+      VoiceType := LinksTo(VoiceElem);
+      if Assigned(VoiceType) then begin
+        Result := EditorID(VoiceType);
+        if Result = '' then Result := Name(VoiceType);
+        if Result <> '' then Exit;
+      end;
+    end;
+
+    // 2. Otherwise, resolve whichever actor this alias points at (Unique
+    //    Actor, or Forced Reference) and use THAT actor's real VTCK.
     ActorRec := LinksTo(ElementByPath(Alias, 'ALUA - Unique Actor'));
     if not Assigned(ActorRec) then ActorRec := LinksTo(ElementByPath(Alias, 'ALUA'));
+    if not Assigned(ActorRec) then ActorRec := LinksTo(ElementByPath(Alias, 'ALFR - Forced Reference'));
+    if not Assigned(ActorRec) then ActorRec := LinksTo(ElementByPath(Alias, 'ALFR'));
     if Assigned(ActorRec) then begin
-      Result := EditorID(ActorRec);
-      if Result = '' then Result := Name(ActorRec);
-    end else begin
-      // Fall back to alias name
-      Result := GetElementEditValues(Alias, 'ALID - Alias Name');
-      if Result = '' then Result := GetElementEditValues(Alias, 'ALID');
-      if Result = '' then Result := 'Alias' + IntToStr(AliasID);
+      Result := ResolveVoiceTypeForActor(ActorRec);
+      if Result <> '' then Exit;
     end;
+
+    // 3. Last resort: name the alias itself, flagged clearly for a manual check.
+    AliasName := GetElementEditValues(Alias, 'ALID - Alias Name');
+    if AliasName = '' then AliasName := GetElementEditValues(Alias, 'ALID');
+    if AliasName = '' then AliasName := 'Alias' + IntToStr(AliasID);
+    Result := AliasName;
+    AddMessage('  [!] Could not resolve a VoiceType for alias "' + AliasName + '" -- using the alias name as a fallback. Double-check this one.');
     Exit;
   end;
+end;
+
+//============================================================================
+// Scans a Conditions list for whichever speaker-identifying function is
+// present, in strict priority order -- GetIsVoiceType (unambiguous) beats
+// GetIsAliasRef (resolves through the alias) beats GetIsID (an actor's own
+// identity, needs one more lookup to find its real VoiceType). This runs as
+// two full passes rather than "whichever comes first in the list," since the
+// original bug was exactly that: an incidental condition ordering difference
+// between two INFOs for the same character produced two different results.
+function ScanConditionsForVoiceType(Quest: IInterface; Conditions: IInterface): string;
+var
+  i, AliasID: integer;
+  Condition, Elem: IInterface;
+  Func: string;
+begin
+  Result := '';
+  if not Assigned(Conditions) then Exit;
+
+  // Pass 1: explicit GetIsVoiceType wins outright, regardless of position.
+  for i := 0 to Pred(ElementCount(Conditions)) do begin
+    Condition := ElementByIndex(Conditions, i);
+    Func := GetElementEditValues(Condition, 'CTDA\Function');
+    if Func = 'GetIsVoiceType' then begin
+      Elem := LinksTo(ElementByPath(Condition, 'CTDA\Voice Type'));
+      if not Assigned(Elem) then Elem := LinksTo(ElementByPath(Condition, 'CTDA\Parameter #1'));
+      if Assigned(Elem) then begin
+        Result := EditorID(Elem);
+        if Result = '' then Result := Name(Elem);
+        if Result <> '' then Exit;
+      end;
+    end;
+  end;
+
+  // Pass 2: GetIsAliasRef -- resolve through the alias (handles VTYP-only markers).
+  for i := 0 to Pred(ElementCount(Conditions)) do begin
+    Condition := ElementByIndex(Conditions, i);
+    Func := GetElementEditValues(Condition, 'CTDA\Function');
+    if Func = 'GetIsAliasRef' then begin
+      AliasID := GetElementNativeValues(Condition, 'CTDA\Parameter #1');
+      if AliasID = 0 then
+        try AliasID := StrToInt(GetElementEditValues(Condition, 'CTDA\Parameter #1')); except end;
+      Result := ResolveVoiceTypeForAlias(Quest, AliasID);
+      if Result <> '' then Exit;
+    end;
+  end;
+
+  // Pass 3: GetIsID -- an actor identity, not a VoiceType. Resolve that
+  // actor's real VTCK rather than using its EditorID directly.
+  for i := 0 to Pred(ElementCount(Conditions)) do begin
+    Condition := ElementByIndex(Conditions, i);
+    Func := GetElementEditValues(Condition, 'CTDA\Function');
+    if Func = 'GetIsID' then begin
+      Elem := LinksTo(ElementByPath(Condition, 'CTDA\Base Object'));
+      if not Assigned(Elem) then Elem := LinksTo(ElementByPath(Condition, 'CTDA\Parameter #1'));
+      if not Assigned(Elem) then Elem := LinksTo(ElementByPath(Condition, 'CTDA\Parameter #2'));
+      if Assigned(Elem) then begin
+        Result := ResolveVoiceTypeForActor(Elem);
+        if Result <> '' then Exit;
+      end;
+    end;
+  end;
+end;
+
+//============================================================================
+function GetVoiceTypeForInfo(Quest: IInterface; Info: IInterface; QuestConditions: IInterface): string;
+var
+  Speaker: IInterface;
+  Conditions: IInterface;
+begin
+  Result := '';
+
+  // ANAM direct speaker override on the INFO -- still needs the extra hop
+  // to that actor's real VTCK, never its own EditorID.
+  Speaker := ElementByName(Info, 'ANAM - Speaker');
+  if Assigned(Speaker) then begin
+    Speaker := LinksTo(Speaker);
+    if Assigned(Speaker) then begin
+      Result := ResolveVoiceTypeForActor(Speaker);
+      if Result <> '' then Exit;
+    end;
+  end;
+
+  Conditions := ElementByName(Info, 'Conditions');
+  Result := ScanConditionsForVoiceType(Quest, Conditions);
+  if Result <> '' then Exit;
+
+  if Assigned(QuestConditions) then begin
+    Result := ScanConditionsForVoiceType(Quest, QuestConditions);
+    if Result <> '' then Exit;
+  end;
+
+  Result := 'Unknown';
+  AddMessage('  [!] Could not determine a VoiceType for this line at all -- check it manually.');
 end;
 
 //============================================================================
@@ -250,7 +370,7 @@ begin
     if ForcedSpeaker <> '' then
       SpeakerName := ForcedSpeaker
     else
-      SpeakerName := GetSpeakerName(Info, QuestConditions);
+      SpeakerName := GetVoiceTypeForInfo(Quest, Info, QuestConditions);
 
     for r := 0 to Pred(ElementCount(Responses)) do begin
       Response := ElementByIndex(Responses, r);
@@ -308,7 +428,7 @@ begin
       try ActorAliasID := StrToInt(GetElementEditValues(Action, 'ALID - Actor ID')); except end;
     if ActorAliasID = 0 then
       try ActorAliasID := StrToInt(GetElementEditValues(Action, 'ALID')); except end;
-    SpeakerName := GetAliasActorName(Quest, ActorAliasID);
+    SpeakerName := ResolveVoiceTypeForAlias(Quest, ActorAliasID);
 
     ProcessDialogueWithSpeaker(Quest, Dial, SpeakerName);
   end;
