@@ -71,7 +71,8 @@ internal sealed class BatchProcessor
                 continue;
             }
 
-            if (!_credentialsByProvider.TryGetValue(mapEntry.ProviderId, out var creds) || !creds.HasApiKey)
+            // Local providers (OmniVoice, Qwen3-TTS) run on this computer and have no key to check.
+            if (provider.RequiresApiKey && (!_credentialsByProvider.TryGetValue(mapEntry.ProviderId, out var creds) || !creds.HasApiKey))
             {
                 failures.Add((row, $"No API key configured for provider '{provider.DisplayName}' (VoiceType '{row.VoiceType}'). Add it in Settings."));
                 failedCount++;
@@ -112,7 +113,7 @@ internal sealed class BatchProcessor
                 ct.ThrowIfCancellationRequested();
 
                 Directory.CreateDirectory(Path.GetDirectoryName(item.WavPath)!);
-                var creds = _credentialsByProvider[item.Map.ProviderId];
+                var creds = _credentialsByProvider.TryGetValue(item.Map.ProviderId, out var found) ? found : new ProviderCredentials();
 
                 string statusSuffix = "";
                 if (!File.Exists(item.WavPath) || options.Overwrite)

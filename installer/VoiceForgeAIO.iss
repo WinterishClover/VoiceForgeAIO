@@ -20,7 +20,7 @@
 ;    the command line). Output lands in installer_output\VoiceForgeAIO-Setup.exe.
 
 #define MyAppName "VoiceForge AIO"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "WinterishClover"
 #define MyAppURL "https://www.patreon.com/cw/winterishclover"
 #define MyAppExeName "VoiceForgeAIO.exe"

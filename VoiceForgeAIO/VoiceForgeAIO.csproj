@@ -38,4 +38,10 @@
     <None Include="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- Python bridges for the local TTS providers (OmniVoice, Qwen3-TTS). The services
+       look for them in a "tools" folder next to the exe. -->
+  <ItemGroup>
+    <None Include="tools\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

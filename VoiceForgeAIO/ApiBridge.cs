@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Photino.NET;
+using VoiceForgeAIO.LocalTts;
 using VoiceForgeAIO.Providers;
 
 namespace VoiceForgeAIO;
@@ -70,6 +71,22 @@ internal sealed class ApiBridge
         "stopBatch" => Task.FromResult<object?>(StopBatch()),
         "markSplashSeen" => Task.FromResult<object?>(MarkSplashSeen()),
         "openExternalUrl" => Task.FromResult<object?>(OpenExternalUrl(args)),
+        "omnivoice.get" => Task.FromResult<object?>(OmniVoiceState()),
+        "omnivoice.save" => Task.FromResult<object?>(OmniVoiceSave(args)),
+        "omnivoice.check" => OmniVoiceCheckAsync(),
+        "omnivoice.stop" => Task.FromResult<object?>(OmniVoiceStop()),
+        "omnivoice.voice.save" => Task.FromResult<object?>(OmniVoiceSaveVoice(args)),
+        "omnivoice.voice.delete" => Task.FromResult<object?>(OmniVoiceDeleteVoice(args)),
+        "omnivoice.reference" => Task.FromResult<object?>(OmniVoiceAddReference(args)),
+        "omnivoice.sample" => OmniVoiceSampleAsync(args),
+        "qwen3tts.get" => Task.FromResult<object?>(Qwen3TtsState()),
+        "qwen3tts.save" => Task.FromResult<object?>(Qwen3TtsSave(args)),
+        "qwen3tts.check" => Qwen3TtsCheckAsync(),
+        "qwen3tts.stop" => Task.FromResult<object?>(Qwen3TtsStop()),
+        "qwen3tts.voice.save" => Task.FromResult<object?>(Qwen3TtsSaveVoice(args)),
+        "qwen3tts.voice.delete" => Task.FromResult<object?>(Qwen3TtsDeleteVoice(args)),
+        "qwen3tts.reference" => Task.FromResult<object?>(Qwen3TtsAddReference(args)),
+        "qwen3tts.sample" => Qwen3TtsSampleAsync(args),
         _ => throw new InvalidOperationException($"Unknown method: {method}")
     };
 
@@ -99,7 +116,8 @@ internal sealed class ApiBridge
                 displayName = p.DisplayName,
                 models = p.AvailableModels,
                 defaultModel = p.DefaultModel,
-                supportsWav = p.SupportsWavOutput
+                supportsWav = p.SupportsWavOutput,
+                requiresApiKey = p.RequiresApiKey
             }),
             providerKeys,
             settings = new
@@ -218,7 +236,10 @@ internal sealed class ApiBridge
 
         foreach (var provider in TtsProviderRegistry.All)
         {
-            if (!req.ProviderKeys.TryGetValue(provider.Id, out var pair) || string.IsNullOrWhiteSpace(pair.ApiKey))
+            // Local providers have no key; their voices are the ones made on the Local Voices page.
+            req.ProviderKeys.TryGetValue(provider.Id, out var pair);
+            pair ??= new ProviderKeyPair();
+            if (provider.RequiresApiKey && string.IsNullOrWhiteSpace(pair.ApiKey))
                 continue;
 
             try
@@ -497,6 +518,68 @@ internal sealed class ApiBridge
         {
             return new { ok = false, error = ex.Message };
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Local voices (OmniVoice, Qwen3-TTS)
+    // ------------------------------------------------------------------
+
+    private const string SampleLine = "The road north is long, and the nights grow cold.";
+
+    private static string SampleText(string? text)
+    {
+        var sample = string.IsNullOrWhiteSpace(text) ? SampleLine : text.Trim();
+        if (sample.Length > 300) throw new InvalidOperationException("Keep the sample under 300 characters.");
+        return sample;
+    }
+
+    private static T Read<T>(JsonElement args, string whatIsMissing) =>
+        args.ValueKind == JsonValueKind.Undefined ? throw new InvalidOperationException(whatIsMissing) : args.Deserialize<T>(JsonOpts) ?? throw new InvalidOperationException(whatIsMissing);
+
+    private static OmniVoiceService Omni => OmniVoiceService.Shared!;
+    private static Qwen3TtsService Qwen => Qwen3TtsService.Shared!;
+
+    private static object OmniVoiceState() => new
+    {
+        settings = Omni.Settings, voices = Omni.Voices, configured = Omni.Configured, running = Omni.Running,
+        tags = OmniVoiceService.SupportedTags,
+        traits = OmniVoiceService.InstructGroups.Select(g => new { group = g.Group, items = g.Items }).ToArray()
+    };
+
+    private static object Qwen3TtsState() => new
+    {
+        settings = Qwen.Settings, voices = Qwen.Voices, configured = Qwen.Configured, running = Qwen.Running,
+        speakers = Qwen3TtsService.Speakers, languages = Qwen3TtsService.Languages
+    };
+
+    private object OmniVoiceSave(JsonElement args) { Omni.SaveSettings(Read<OmniVoiceSettingsRequest>(args, "Give the OmniVoice settings.").Settings); return OmniVoiceState(); }
+    private async Task<object?> OmniVoiceCheckAsync() => new { report = await Omni.CheckAsync() };
+    private object OmniVoiceStop() { Omni.Stop(); return OmniVoiceState(); }
+    private object OmniVoiceSaveVoice(JsonElement args) { Omni.SaveVoice(Read<OmniVoiceVoiceRequest>(args, "Give the voice.").Voice); return OmniVoiceState(); }
+    private object OmniVoiceDeleteVoice(JsonElement args) { Omni.DeleteVoice(Read<OmniVoiceIdRequest>(args, "Choose a voice.").Id); return OmniVoiceState(); }
+    private object OmniVoiceAddReference(JsonElement args) => new { fileName = Omni.AddReference(Read<OmniVoicePathRequest>(args, "Choose a recording.").Path) };
+
+    private async Task<object?> OmniVoiceSampleAsync(JsonElement args)
+    {
+        var req = Read<OmniVoiceSampleRequest>(args, "Choose a voice.");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(12));
+        var wav = await Omni.SpeakAsync(req.Voice, SampleText(req.Text), OmniVoiceProvider.StepsFor(OmniVoiceProvider.Best), timeout.Token);
+        return new { audioData = Convert.ToBase64String(wav) };
+    }
+
+    private object Qwen3TtsSave(JsonElement args) { Qwen.SaveSettings(Read<Qwen3TtsSettingsRequest>(args, "Give the Qwen3-TTS settings.").Settings); return Qwen3TtsState(); }
+    private async Task<object?> Qwen3TtsCheckAsync() => new { report = await Qwen.CheckAsync() };
+    private object Qwen3TtsStop() { Qwen.Stop(); return Qwen3TtsState(); }
+    private object Qwen3TtsSaveVoice(JsonElement args) { Qwen.SaveVoice(Read<Qwen3TtsVoiceRequest>(args, "Give the voice.").Voice); return Qwen3TtsState(); }
+    private object Qwen3TtsDeleteVoice(JsonElement args) { Qwen.DeleteVoice(Read<Qwen3TtsIdRequest>(args, "Choose a voice.").Id); return Qwen3TtsState(); }
+    private object Qwen3TtsAddReference(JsonElement args) => new { fileName = Qwen.AddReference(Read<Qwen3TtsPathRequest>(args, "Choose a recording.").Path) };
+
+    private async Task<object?> Qwen3TtsSampleAsync(JsonElement args)
+    {
+        var req = Read<Qwen3TtsSampleRequest>(args, "Choose a voice.");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(12));
+        var wav = await Qwen.SpeakAsync(req.Voice, SampleText(req.Text), req.Emotion, timeout.Token);
+        return new { audioData = Convert.ToBase64String(wav) };
     }
 
     // ------------------------------------------------------------------

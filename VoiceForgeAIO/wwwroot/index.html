@@ -16,7 +16,7 @@
       <div class="splash-mark">VOICEFORGE <span class="accent">AIO</span></div>
       <div class="splash-tagline">Multi-provider TTS + LIP/FUZ pipeline for Skyrim modding</div>
       <div class="splash-body">
-        Generate voiced dialogue across six TTS providers, build matching
+        Generate voiced dialogue across eight TTS providers (two of them free and local), build matching
         <strong>.lip</strong> files, and package everything into Bethesda's
         <strong>.fuz</strong> format &mdash; all from one place.
       </div>
@@ -54,6 +54,10 @@
           <button class="nav-item" data-page="batch-page" title="CSV Batch Generate">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16M13 13h5M13 17h5"/></svg>
             <span class="nav-label">CSV Batch Generate</span>
+          </button>
+          <button class="nav-item" data-page="local-voices-page" title="Local Voices">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4M7 10h2l1.5-2.5 2 5 1.5-2.5H17"/></svg>
+            <span class="nav-label">Local Voices</span>
           </button>
         </nav>
       </aside>
@@ -198,6 +202,154 @@
           </div>
         </section>
 
+        <!-- ---- Local Voices page (OmniVoice + Qwen3-TTS) ---- -->
+        <section class="page" id="local-voices-page">
+          <div class="page-header">
+            <h2>Local Voices</h2>
+            <span class="page-subtitle">Free text-to-speech on your own graphics card</span>
+          </div>
+
+          <div class="card-body-plain" style="max-width: 820px;">
+            <div class="field-hint" style="margin-top:0;">
+              OmniVoice and Qwen3-TTS run on this computer: no API key, no per-line cost, nothing leaves your machine.
+              Set up each one once, make voices here, then pick the provider <strong>OmniVoice (local)</strong> or
+              <strong>Qwen3-TTS (local)</strong> in the Voice Mapping page and press <strong>Get Available Voices</strong>.
+              The model stays loaded while lines are being made and is unloaded after a quiet spell so the card is free again.
+              See <code>docs/omnivoice.md</code> and <code>docs/qwen3-tts.md</code> for the install steps.
+            </div>
+
+            <!-- ---------- OmniVoice ---------- -->
+            <details class="local-card" id="omniSection">
+              <summary>OmniVoice <span id="omniState" class="local-state"></span></summary>
+              <div class="local-card-body">
+                <div class="field-hint">Describe a voice from OmniVoice's own list of traits, clone it from a short recording, or let the model choose. Delivery tags such as [laughter] and [sigh] in a line are spoken; other tags are removed.</div>
+                <h4 class="local-heading">Install</h4>
+                <label class="field-label" for="omniPython">Python of the OmniVoice environment</label>
+                <input type="text" id="omniPython" placeholder="/root/miniconda3/envs/omnivoice/bin/python" />
+                <div class="field-row" style="margin-top:10px;">
+                  <div class="grow">
+                    <label class="field-label" for="omniDistro">WSL distro (blank = default)</label>
+                    <input type="text" id="omniDistro" />
+                  </div>
+                  <div class="fixed" style="width:170px;">
+                    <label class="field-label" for="omniIdle">Unload after minutes idle</label>
+                    <input type="number" id="omniIdle" min="1" max="240" value="10" />
+                  </div>
+                </div>
+                <div class="checkbox-row"><input type="checkbox" id="omniWsl" /><label for="omniWsl">Run inside WSL</label></div>
+                <div class="button-bar">
+                  <button id="omniSaveButton">Save</button>
+                  <button class="secondary" id="omniCheckButton">Check the install</button>
+                  <button class="secondary" id="omniStopButton">Unload model</button>
+                </div>
+                <div id="omniMessage" class="local-message" role="status"></div>
+
+                <h4 class="local-heading">Voices</h4>
+                <div class="field-row">
+                  <div class="grow"><label class="field-label" for="omniVoiceSelect">Voice</label><select id="omniVoiceSelect"></select></div>
+                  <div class="grow"><label class="field-label" for="omniVoiceName">Name</label><input type="text" id="omniVoiceName" placeholder="Gruff old guard" /></div>
+                </div>
+                <div class="field-row">
+                  <div class="grow">
+                    <label class="field-label" for="omniVoiceKind">Made from</label>
+                    <select id="omniVoiceKind"><option value="design">A description</option><option value="clone">A recording (clone)</option><option value="auto">Let the model choose</option></select>
+                  </div>
+                  <div class="grow"><label class="field-label" for="omniVoiceSpeed">Speed (0.6 to 1.6)</label><input type="number" id="omniVoiceSpeed" min="0.6" max="1.6" step="0.05" value="1" /></div>
+                </div>
+                <div id="omniTraitField">
+                  <label class="field-label">Voice traits (OmniVoice only understands these; pick any)</label>
+                  <div id="omniTraits" class="trait-grid"></div>
+                </div>
+                <div id="omniReferenceField" class="field-row">
+                  <div class="grow"><label class="field-label" for="omniVoiceReference">Recording (3 to 10 seconds of clean speech)</label><input type="text" id="omniVoiceReference" readonly /></div>
+                  <div class="fixed"><button class="secondary" id="omniReferenceButton">Browse&hellip;</button></div>
+                </div>
+                <div id="omniReferenceTextField">
+                  <label class="field-label" for="omniVoiceReferenceText">What the recording says (blank = OmniVoice listens and writes it itself)</label>
+                  <input type="text" id="omniVoiceReferenceText" />
+                </div>
+                <label class="field-label" for="omniSampleText" style="margin-top:10px;">Sample line</label>
+                <input type="text" id="omniSampleText" placeholder="The road north is long, and the nights grow cold." />
+                <div class="button-bar">
+                  <button class="secondary" id="omniNewButton">New voice</button>
+                  <button id="omniVoiceSaveButton">Save voice</button>
+                  <button class="secondary" id="omniSampleButton">Hear sample</button>
+                  <button class="danger" id="omniVoiceDeleteButton">Delete voice</button>
+                </div>
+                <div id="omniVoiceMessage" class="local-message" role="status"></div>
+              </div>
+            </details>
+
+            <!-- ---------- Qwen3-TTS ---------- -->
+            <details class="local-card" id="qwenSection">
+              <summary>Qwen3-TTS <span id="qwenState" class="local-state"></span></summary>
+              <div class="local-card-body">
+                <div class="field-hint">Describe a voice in your own words (any wording, any language), clone one from a short recording, or use a built-in speaker.</div>
+                <h4 class="local-heading">Install</h4>
+                <label class="field-label" for="qwenPython">Python of the Qwen3-TTS environment</label>
+                <input type="text" id="qwenPython" placeholder="/root/miniconda3/envs/qwen3tts/bin/python" />
+                <div class="field-row" style="margin-top:10px;">
+                  <div class="grow">
+                    <label class="field-label" for="qwenDistro">WSL distro (blank = default)</label>
+                    <input type="text" id="qwenDistro" />
+                  </div>
+                  <div class="fixed" style="width:170px;">
+                    <label class="field-label" for="qwenIdle">Unload after minutes idle</label>
+                    <input type="number" id="qwenIdle" min="1" max="240" value="10" />
+                  </div>
+                </div>
+                <div class="checkbox-row"><input type="checkbox" id="qwenWsl" /><label for="qwenWsl">Run inside WSL</label></div>
+                <div class="button-bar">
+                  <button id="qwenSaveButton">Save</button>
+                  <button class="secondary" id="qwenCheckButton">Check the install</button>
+                  <button class="secondary" id="qwenStopButton">Unload model</button>
+                </div>
+                <div id="qwenMessage" class="local-message" role="status"></div>
+
+                <h4 class="local-heading">Voices</h4>
+                <div class="field-row">
+                  <div class="grow"><label class="field-label" for="qwenVoiceSelect">Voice</label><select id="qwenVoiceSelect"></select></div>
+                  <div class="grow"><label class="field-label" for="qwenVoiceName">Name</label><input type="text" id="qwenVoiceName" placeholder="Gruff old guard" /></div>
+                </div>
+                <div class="field-row">
+                  <div class="grow">
+                    <label class="field-label" for="qwenVoiceKind">Made from</label>
+                    <select id="qwenVoiceKind"><option value="design">A description</option><option value="clone">A recording (clone)</option><option value="preset">A built-in speaker</option></select>
+                  </div>
+                  <div class="grow"><label class="field-label" for="qwenVoiceLanguage">Language</label><select id="qwenVoiceLanguage"></select></div>
+                </div>
+                <div id="qwenInstructField">
+                  <label class="field-label" for="qwenVoiceInstruct" id="qwenInstructLabel">Describe the voice in your own words</label>
+                  <input type="text" id="qwenVoiceInstruct" placeholder="A gruff old man with a slow, tired voice and a northern accent" />
+                </div>
+                <div id="qwenSpeakerField">
+                  <label class="field-label" for="qwenVoiceSpeaker">Speaker</label>
+                  <select id="qwenVoiceSpeaker"></select>
+                </div>
+                <div id="qwenReferenceField" class="field-row">
+                  <div class="grow"><label class="field-label" for="qwenVoiceReference">Recording (3 to 10 seconds of clean speech)</label><input type="text" id="qwenVoiceReference" readonly /></div>
+                  <div class="fixed"><button class="secondary" id="qwenReferenceButton">Browse&hellip;</button></div>
+                </div>
+                <div id="qwenReferenceTextField">
+                  <label class="field-label" for="qwenVoiceReferenceText">What the recording says (recommended: the clone is more accurate with it)</label>
+                  <input type="text" id="qwenVoiceReferenceText" />
+                </div>
+                <div class="field-row" style="margin-top:10px;">
+                  <div class="grow"><label class="field-label" for="qwenSampleText">Sample line</label><input type="text" id="qwenSampleText" placeholder="The road north is long, and the nights grow cold." /></div>
+                  <div class="fixed" style="width:170px;"><label class="field-label" for="qwenSampleEmotion">Sample emotion</label><select id="qwenSampleEmotion"></select></div>
+                </div>
+                <div class="button-bar">
+                  <button class="secondary" id="qwenNewButton">New voice</button>
+                  <button id="qwenVoiceSaveButton">Save voice</button>
+                  <button class="secondary" id="qwenSampleButton">Hear sample</button>
+                  <button class="danger" id="qwenVoiceDeleteButton">Delete voice</button>
+                </div>
+                <div id="qwenVoiceMessage" class="local-message" role="status"></div>
+              </div>
+            </details>
+          </div>
+        </section>
+
       </main>
 
       <!-- ===================== Resizer + Log panel ===================== -->
@@ -292,7 +444,9 @@
         <h4>1. Add your API keys</h4>
         <p>Open <strong>Settings</strong> from the top menu and paste in the API
           key for whichever provider(s) you plan to use &mdash; you don't need all
-          six, just the ones you're actually using. MiniMax additionally needs a
+          of them, just the ones you're actually using. <strong>OmniVoice</strong> and
+          <strong>Qwen3-TTS</strong> run on your own computer and need no key (see
+          "Local voices" below). MiniMax additionally needs a
           <strong>Group ID</strong> from its dashboard, separate from the API key.
           Click <strong>Show keys</strong> if you want to double-check what you
           typed, then <strong>Save Settings</strong>.</p>
@@ -330,6 +484,19 @@
           generated files are skipped on a re-run unless you check
           <strong>Overwrite existing files</strong>, so it's always safe to stop
           and resume a batch.</p>
+
+        <h4>Local voices (OmniVoice and Qwen3-TTS)</h4>
+        <p>These two providers run on your own graphics card: free, no key, nothing
+          leaves your computer. Open the <strong>Local Voices</strong> page, give each
+          one the Python of its own environment (optionally run inside WSL), click
+          <strong>Check the install</strong>, then make voices &mdash; described in words,
+          cloned from a 3&ndash;10 second recording, or (Qwen3-TTS) a built-in speaker &mdash;
+          and use <strong>Hear sample</strong> to audition them. In Voice Mapping pick
+          <strong>OmniVoice (local)</strong> or <strong>Qwen3-TTS (local)</strong> and click
+          <strong>Get Available Voices</strong> to choose one of your voices. The model is
+          loaded on the first line and unloaded after the idle time you set. Because
+          voices live on your computer, an exported mapping CSV that uses them only
+          works on the machine that made them.</p>
 
         <h4>5. LIP and FUZ generation (optional)</h4>
         <p>Check <strong>Generate .lip files</strong> to also build facial

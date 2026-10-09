@@ -454,3 +454,21 @@ table.grid select:focus, table.grid input[type="text"]:focus { border-color: var
   header.topbar { height: 46px; }
 }
 
+
+/* ==================== Local Voices page (OmniVoice / Qwen3-TTS) ==================== */
+.hidden { display: none !important; }
+
+.local-card { background: var(--white); border: 1px solid var(--light-gray-dim); border-radius: var(--radius); margin-top: 14px; }
+.local-card > summary { cursor: pointer; padding: 12px 16px; font-family: var(--font-display); font-weight: 700; font-size: 15px; color: var(--slate-dark); list-style: none; }
+.local-card > summary::-webkit-details-marker { display: none; }
+.local-card > summary::before { content: "\25B8"; display: inline-block; width: 16px; transition: transform 0.15s ease; }
+.local-card[open] > summary::before { transform: rotate(90deg); }
+.local-card-body { padding: 4px 16px 16px; border-top: 1px solid var(--light-gray); }
+.local-state { font-family: var(--font); font-weight: 500; font-size: 12px; font-style: italic; color: var(--charcoal); opacity: 0.7; margin-left: 6px; }
+.local-heading { font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--slate-dark); margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--light-gray); }
+.local-message { font-size: 12.5px; margin-top: 10px; min-height: 1em; }
+.local-message.success { color: var(--ok); }
+.local-message.error { color: var(--danger); }
+.trait-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 12px; margin-bottom: 10px; }
+.trait-grid .field-label { font-weight: 600; }
+.local-card-body > div:not(.field-row):not(.button-bar):not(.checkbox-row) { margin-bottom: 10px; }

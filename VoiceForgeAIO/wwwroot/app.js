@@ -1,10 +1,11 @@
 import { call, on } from "./bridge.js";
+import { initLocalVoices } from "./local-voices.js";
 
 // ==========================================================================
 // State
 // ==========================================================================
 
-let providers = [];          // [{id, displayName, models, defaultModel, supportsWav}]
+let providers = [];          // [{id, displayName, models, defaultModel, supportsWav, requiresApiKey}]
 let providerKeys = {};       // {providerId: {apiKey, groupId}}
 let voiceMap = [];           // [{voiceType, providerId, voiceId, voiceDisplay}]
 let voicesByProvider = {};   // {providerId: [{voiceId, displayName, description}]}
@@ -31,11 +32,21 @@ async function init() {
   renderVoiceMapTable();
   refreshSingleLineDropdowns();
 
+  // Local providers (OmniVoice, Qwen3-TTS) list the voices made on the Local Voices page.
+  await initLocalVoices(onLocalVoicesChanged).catch((err) => appendLog(`Local voices: ${err.message}`, "error"));
+
   if (state.hasSeenSplash) {
     document.getElementById("splash-overlay").classList.add("hidden");
   }
 
   appendLog('Ready. Enter your API keys in Settings, then "Get Available Voices" before building the Voice Mapping table.');
+}
+
+/** The voices of a local provider changed (loaded, saved or deleted): offer them in Voice Mapping and Single-Line without a refresh. */
+function onLocalVoicesChanged(providerId, voices) {
+  voicesByProvider[providerId] = voices;
+  renderVoiceMapTable();
+  refreshSingleLineDropdowns();
 }
 
 function applySettingsToForm(s) {
@@ -66,6 +77,14 @@ function renderProviderKeyRows() {
 
   for (const p of providers) {
     const keys = providerKeys[p.id] || { apiKey: "", groupId: "" };
+
+    if (p.requiresApiKey === false) {
+      const note = document.createElement("div");
+      note.className = "field-hint";
+      note.innerHTML = `<strong>${escapeHtml(p.displayName)}</strong>: runs on this computer, no key needed. Set it up on the Local Voices page.`;
+      container.appendChild(note);
+      continue;
+    }
 
     const row = document.createElement("div");
     row.className = "field-row";
@@ -282,7 +301,7 @@ function refreshSingleLineDropdowns() {
   const voices = voicesByProvider[providerId] || [];
   voiceSelect.innerHTML = voices.length
     ? voices.map((v) => `<option value="${v.voiceId}" data-display="${escapeAttr(v.displayName)}">${escapeHtml(v.displayName)} [${v.voiceId}]</option>`).join("")
-    : `<option value="">-- click "Get Available Voices" above --</option>`;
+    : `<option value="">-- click "Get Available Voices" above (local providers: make a voice on the Local Voices page) --</option>`;
 }
 
 async function generateSingleLine() {
@@ -295,14 +314,14 @@ async function generateSingleLine() {
 
   const voiceSelect = document.getElementById("single-voice");
   const voiceId = voiceSelect.value;
-  if (!voiceId) return appendLog("Select a voice first (Get Available Voices).", "error");
+  if (!voiceId) return appendLog(provider.requiresApiKey === false ? "Select a voice first (make one on the Local Voices page)." : "Select a voice first (Get Available Voices).", "error");
 
   const outputPath = document.getElementById("single-output-path").value.trim();
   if (!outputPath) return appendLog("Select an output path first.", "error");
 
   const keys = collectProviderKeysFromForm();
   const creds = keys[providerId] || { apiKey: "", groupId: "" };
-  if (!creds.apiKey) return appendLog(`No API key configured for ${provider.displayName}.`, "error");
+  if (provider.requiresApiKey !== false && !creds.apiKey) return appendLog(`No API key configured for ${provider.displayName}.`, "error");
 
   const modelId = document.getElementById("single-model").value || provider.defaultModel;
   const fileName = document.getElementById("single-filename").value.trim() || "line1.wav";

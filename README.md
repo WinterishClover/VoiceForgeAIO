@@ -1,6 +1,25 @@
 # VoiceForge AIO
 
-## New in this version: web-based UI (Photino.NET)
+## New in this version: free local voices (OmniVoice and Qwen3-TTS)
+
+Two new providers that run on your own graphics card -- **no API key, no
+per-line cost, nothing leaves your computer**:
+
+- **OmniVoice (local)** -- voices described from a fixed list of traits
+  (gender, age, pitch, accent, whisper), cloned from a short recording, or
+  chosen by the model. Quality choice: 32 steps (best) or 16 steps (fast).
+- **Qwen3-TTS (local)** -- voices described in your own words (any language),
+  cloned from a short recording, or one of nine built-in speakers.
+
+Set them up on the new **Local Voices** page (point it at the Python of each
+tool's own environment, optionally run inside WSL, then *Check the install*),
+make voices and audition them with *Hear sample*, then pick the provider in
+**Voice Mapping**, **Single-Line Generate** or a CSV batch like any other.
+Install steps: [docs/omnivoice.md](docs/omnivoice.md) and
+[docs/qwen3-tts.md](docs/qwen3-tts.md). The Python bridge scripts they use
+live in `VoiceForgeAIO/tools/` and ship next to the exe.
+
+## Earlier change: web-based UI (Photino.NET)
 
 The UI is now built with real HTML/CSS/JavaScript, rendered through the OS's
 native WebView2 control via Photino.NET, instead of WinForms. This is why:
@@ -89,7 +108,7 @@ per-VoiceType output routing.
 ## What's new in this version
 
 - **Multi-provider TTS**: Inworld, ElevenLabs, MiniMax, Cartesia, Fish Audio,
-  and Hume Octave, all behind one interface. Each VoiceType in the mapping
+  Hume Octave, and the local OmniVoice and Qwen3-TTS, all behind one interface. Each VoiceType in the mapping
   table can point at a different provider.
 - **Encrypted settings**: every provider's API key is encrypted at rest with
   Windows DPAPI (tied to your Windows account), not just Base64-obscured.
@@ -161,8 +180,8 @@ local copies:
   your Steam install, or grab it from the Creation Kit / G.E.C.K. itself.
 
 **Not every provider supports LIP generation.** FaceFXWrapper needs
-uncompressed WAV/PCM audio. Inworld, ElevenLabs, MiniMax, Cartesia, and Fish
-Audio all provide that (some natively, some via a raw-PCM request that
+uncompressed WAV/PCM audio. Inworld, ElevenLabs, MiniMax, Cartesia, Fish
+Audio, OmniVoice, and Qwen3-TTS all provide that (some natively, some via a raw-PCM request that
 VoiceForge AIO wraps in a WAV header itself). **Hume Octave only returns
 compressed audio (mp3) in this version**, so LIP generation is automatically
 skipped for any line using a Hume Octave voice -- the WAV still generates
@@ -233,6 +252,4 @@ Set both paths in Settings before checking "Generate .fuz files."
 - OpenAI TTS, Amazon Polly, Azure, Google Cloud (considered, but judged too
   expensive/lower-quality for this use case for now -- easy to add later if
   that changes)
-- OmniVoice / other local TTS (needs voice-saving infrastructure built out
-  as its own app first -- more of a research framework than a ready service
-  right now; revisit later)
+- Other local TTS engines beyond OmniVoice and Qwen3-TTS

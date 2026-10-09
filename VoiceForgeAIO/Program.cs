@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Photino.NET;
+using VoiceForgeAIO.LocalTts;
 
 namespace VoiceForgeAIO;
 
@@ -15,6 +16,12 @@ internal static class Program
 
         try
         {
+            // Local text-to-speech (OmniVoice, Qwen3-TTS) keeps its model in a background Python process;
+            // never leave one running behind a closed app.
+            OmniVoiceService.Shared = new OmniVoiceService();
+            Qwen3TtsService.Shared = new Qwen3TtsService();
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => { OmniVoiceService.Shared?.Dispose(); Qwen3TtsService.Shared?.Dispose(); };
+
             var bridge = new ApiBridge();
 
             var window = new PhotinoWindow()

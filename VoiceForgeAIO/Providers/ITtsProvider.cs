@@ -20,6 +20,9 @@ internal sealed class ProviderCredentials
     public string ApiKey { get; set; } = "";
     public string GroupId { get; set; } = "";
 
+    /// <summary>The delivery (emotion) to use for this one line, for providers that can act on it. Null means none.</summary>
+    public string? Emotion { get; init; }
+
     public bool HasApiKey => !string.IsNullOrWhiteSpace(ApiKey);
 }
 
@@ -46,6 +49,9 @@ internal interface ITtsProvider
     /// is available in this version, so LIP generation must be skipped for its rows.
     /// </summary>
     bool SupportsWavOutput { get; }
+
+    /// <summary>False for a provider that runs on this computer and needs no key.</summary>
+    bool RequiresApiKey => true;
 
     Task<List<ProviderVoice>> ListVoicesAsync(ProviderCredentials credentials, CancellationToken ct = default);
 

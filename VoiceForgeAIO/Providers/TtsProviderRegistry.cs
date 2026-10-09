@@ -11,6 +11,8 @@ internal static class TtsProviderRegistry
         new CartesiaProvider(),
         new FishAudioProvider(),
         new HumeOctaveProvider(),
+        new OmniVoiceProvider(),
+        new Qwen3TtsProvider(),
     };
 
     private static readonly Dictionary<string, ITtsProvider> ById =
