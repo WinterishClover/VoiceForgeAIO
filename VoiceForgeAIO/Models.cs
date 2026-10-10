@@ -54,4 +54,9 @@ internal sealed class AppSettingsModel
     public string LipFuzerPath { get; set; } = "";
 
     public bool HasSeenSplash { get; set; } = false;
+
+    /// <summary>Skyrim's Data folder, where plugins are listed from. Empty = not set (auto-detect offered).</summary>
+    public string SkyrimDataPath { get; set; } = "";
+    /// <summary>Optional second place to look for plugins, e.g. Mod Organizer 2's "mods" folder (scanned one level deep).</summary>
+    public string ExtraPluginFolder { get; set; } = "";
 }

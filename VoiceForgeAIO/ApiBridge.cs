@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Photino.NET;
 using VoiceForgeAIO.LocalTts;
+using VoiceForgeAIO.PluginDialogue;
 using VoiceForgeAIO.Providers;
 
 namespace VoiceForgeAIO;
@@ -71,6 +72,11 @@ internal sealed class ApiBridge
         "stopBatch" => Task.FromResult<object?>(StopBatch()),
         "markSplashSeen" => Task.FromResult<object?>(MarkSplashSeen()),
         "openExternalUrl" => Task.FromResult<object?>(OpenExternalUrl(args)),
+        "detectDataFolder" => Task.FromResult<object?>(DetectDataFolder()),
+        "listPlugins" => Task.FromResult<object?>(ListPlugins(args)),
+        "readPlugin" => ReadPluginAsync(args),
+        "getPluginLines" => Task.FromResult<object?>(GetPluginLines(args)),
+        "exportPluginCsv" => Task.FromResult<object?>(ExportPluginCsv(args)),
         "omnivoice.get" => Task.FromResult<object?>(OmniVoiceState()),
         "omnivoice.save" => Task.FromResult<object?>(OmniVoiceSave(args)),
         "omnivoice.check" => OmniVoiceCheckAsync(),
@@ -131,7 +137,9 @@ internal sealed class ApiBridge
                 concurrency = s.Concurrency,
                 lipGenerationEnabled = s.LipGenerationEnabled,
                 fuzGenerationEnabled = s.FuzGenerationEnabled,
-                lastProviderId = s.LastProviderId
+                lastProviderId = s.LastProviderId,
+                skyrimDataPath = s.SkyrimDataPath,
+                extraPluginFolder = s.ExtraPluginFolder
             },
             voiceMap = PersistenceService.LoadVoiceMap().Select(ToWireVoiceMapEntry),
             cachedVoices = PersistenceService.LoadVoiceCache().ToDictionary(
@@ -154,6 +162,8 @@ internal sealed class ApiBridge
         public bool LipGenerationEnabled { get; set; }
         public bool FuzGenerationEnabled { get; set; }
         public string LastProviderId { get; set; } = "Inworld";
+        public string SkyrimDataPath { get; set; } = "";
+        public string ExtraPluginFolder { get; set; } = "";
     }
     private sealed class ProviderKeyPair { public string ApiKey { get; set; } = ""; public string GroupId { get; set; } = ""; }
 
@@ -184,6 +194,8 @@ internal sealed class ApiBridge
         s.LipGenerationEnabled = req.LipGenerationEnabled;
         s.FuzGenerationEnabled = req.FuzGenerationEnabled;
         s.LastProviderId = req.LastProviderId;
+        s.SkyrimDataPath = req.SkyrimDataPath.Trim();
+        s.ExtraPluginFolder = req.ExtraPluginFolder.Trim();
 
         PersistenceService.SaveSettings(s);
         return new { ok = true };
@@ -378,6 +390,96 @@ internal sealed class ApiBridge
     }
 
     // ------------------------------------------------------------------
+    // Plugin dialogue (read lines straight from a plugin; no xEdit, no CSV)
+    // ------------------------------------------------------------------
+
+    private volatile PluginDialogue.PluginDialogue? _loadedPlugin;
+    private List<PluginFile> _knownPlugins = new();
+
+    private static object DetectDataFolder()
+    {
+        var path = PluginDialogueService.DetectDataFolder();
+        return new { path = path ?? "", found = path != null };
+    }
+
+    private sealed class ListPluginsRequest { public string DataPath { get; set; } = ""; public string ExtraPath { get; set; } = ""; public bool IncludeOfficial { get; set; } }
+
+    private object ListPlugins(JsonElement args)
+    {
+        var req = args.Deserialize<ListPluginsRequest>(JsonOpts) ?? new ListPluginsRequest();
+        if (!string.IsNullOrWhiteSpace(req.DataPath) && !Directory.Exists(req.DataPath.Trim()))
+            throw new InvalidOperationException($"The Skyrim Data folder doesn't exist: {req.DataPath}");
+        _knownPlugins = PluginDialogueService.ScanPlugins(req.DataPath, req.ExtraPath);
+        var shown = _knownPlugins.Where(p => req.IncludeOfficial || !PluginDialogueService.IsOfficialFile(p.Name)).ToList();
+        PushLog($"Found {_knownPlugins.Count} plugin(s) ({shown.Count} shown).");
+        return new { plugins = shown.Select(p => new { name = p.Name, path = p.Path, source = p.Source, sizeKb = (p.Size + 1023) / 1024 }) };
+    }
+
+    private sealed class ReadPluginRequest { public string PluginPath { get; set; } = ""; public string DataPath { get; set; } = ""; public string ExtraPath { get; set; } = ""; }
+
+    private async Task<object?> ReadPluginAsync(JsonElement args)
+    {
+        var req = args.Deserialize<ReadPluginRequest>(JsonOpts) ?? new ReadPluginRequest();
+        if (string.IsNullOrWhiteSpace(req.PluginPath)) throw new InvalidOperationException("Choose a plugin first.");
+        // Masters are looked up among the scanned plugins; rescan if the list is stale or empty.
+        var available = _knownPlugins.Count > 0 ? _knownPlugins : PluginDialogueService.ScanPlugins(req.DataPath, req.ExtraPath);
+        PushLog($"Reading {Path.GetFileName(req.PluginPath)}...");
+        var dialogue = await Task.Run(() => PluginDialogueService.Read(req.PluginPath, available));
+        _loadedPlugin = dialogue;
+        foreach (var w in dialogue.Warnings) PushLog($"Warning: {w}");
+        PushLog($"{dialogue.PluginName}: {dialogue.Lines.Count} line(s) across {dialogue.Lines.Select(l => l.VoiceType).Distinct(StringComparer.OrdinalIgnoreCase).Count()} VoiceType(s).");
+
+        var voiceTypes = dialogue.Lines.GroupBy(l => l.VoiceType, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new
+            {
+                name = g.Key,
+                lines = g.Count(),
+                speakers = g.Select(l => l.Speakers).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Take(6).ToList()
+            }).ToList();
+        // Where the game looks for the finished files; offered as the batch output folder.
+        string suggested = string.IsNullOrWhiteSpace(req.DataPath) ? "" : Path.Combine(req.DataPath.Trim(), "Sound", "Voice", dialogue.PluginName);
+        return new { pluginName = dialogue.PluginName, lineCount = dialogue.Lines.Count, voiceTypes, warnings = dialogue.Warnings, suggestedVoiceFolder = suggested };
+    }
+
+    private sealed class PluginLinesRequest { public int Skip { get; set; } public int Take { get; set; } = 200; public string? Search { get; set; } public List<string>? VoiceTypes { get; set; } }
+
+    private object GetPluginLines(JsonElement args)
+    {
+        var req = args.Deserialize<PluginLinesRequest>(JsonOpts) ?? new PluginLinesRequest();
+        var loaded = _loadedPlugin ?? throw new InvalidOperationException("No plugin is loaded.");
+        IEnumerable<DialogueLine> lines = loaded.Lines;
+        if (req.VoiceTypes is { Count: > 0 })
+        {
+            var set = new HashSet<string>(req.VoiceTypes, StringComparer.OrdinalIgnoreCase);
+            lines = lines.Where(l => set.Contains(l.VoiceType));
+        }
+        if (!string.IsNullOrWhiteSpace(req.Search))
+            lines = lines.Where(l => l.Text.Contains(req.Search, StringComparison.OrdinalIgnoreCase) || l.Id.Contains(req.Search, StringComparison.OrdinalIgnoreCase)
+                                     || l.Speakers.Contains(req.Search, StringComparison.OrdinalIgnoreCase));
+        var all = lines.ToList();
+        return new
+        {
+            total = all.Count,
+            lines = all.Skip(Math.Max(0, req.Skip)).Take(Math.Clamp(req.Take, 1, 1000))
+                .Select(l => new { id = l.Id, voiceType = l.VoiceType, speakers = l.Speakers, text = l.Text })
+        };
+    }
+
+    private sealed class ExportPluginRequest { public string Path { get; set; } = ""; public List<string>? IncludeVoiceTypes { get; set; } }
+
+    /// <summary>Writes the loaded plugin's lines as a CSV in the tool's format, for anyone who still wants the file (or another tool).</summary>
+    private object ExportPluginCsv(JsonElement args)
+    {
+        var req = args.Deserialize<ExportPluginRequest>(JsonOpts) ?? new ExportPluginRequest();
+        var loaded = _loadedPlugin ?? throw new InvalidOperationException("No plugin is loaded.");
+        var include = req.IncludeVoiceTypes is { Count: > 0 } ? new HashSet<string>(req.IncludeVoiceTypes, StringComparer.OrdinalIgnoreCase) : null;
+        var lines = loaded.Lines.Where(l => include is null || include.Contains(l.VoiceType)).ToList();
+        File.WriteAllLines(req.Path, lines.Select(l => $"{CsvService.Escape(l.Id)},{CsvService.Escape(l.VoiceType)},\"{l.Text.Replace("\"", "\"\"")}\""));
+        return new { ok = true, count = lines.Count };
+    }
+
+    // ------------------------------------------------------------------
     // Single-line generate
     // ------------------------------------------------------------------
 
@@ -418,6 +520,10 @@ internal sealed class ApiBridge
     private sealed class StartBatchRequest
     {
         public string CsvPath { get; set; } = "";
+        /// <summary>"csv" (default) reads CsvPath; "plugin" uses the dialogue of the plugin loaded on the Plugin Dialogue page.</summary>
+        public string Source { get; set; } = "csv";
+        /// <summary>For the plugin source: only these VoiceTypes (null/empty = all).</summary>
+        public List<string>? IncludeVoiceTypes { get; set; }
         public string VoiceFolder { get; set; } = "";
         public int Concurrency { get; set; } = 3;
         public bool Overwrite { get; set; }
@@ -438,8 +544,24 @@ internal sealed class ApiBridge
         var req = args.Deserialize<StartBatchRequest>(JsonOpts) ?? throw new InvalidOperationException("Invalid request.");
 
         List<CsvRow> rows;
-        try { rows = CsvService.ReadRows(req.CsvPath); }
-        catch (Exception ex) { return Task.FromResult<object?>(new { ok = false, error = $"Failed to parse CSV: {ex.Message}" }); }
+        string sourceLabel;
+        if (req.Source == "plugin")
+        {
+            var loaded = _loadedPlugin;
+            if (loaded is null)
+                return Task.FromResult<object?>(new { ok = false, error = "No plugin is loaded. Open the Plugin Dialogue page and read a plugin first." });
+            var include = req.IncludeVoiceTypes is { Count: > 0 } ? new HashSet<string>(req.IncludeVoiceTypes, StringComparer.OrdinalIgnoreCase) : null;
+            rows = loaded.Lines.Where(l => include is null || include.Contains(l.VoiceType)).Select(l => new CsvRow(l.Id, l.VoiceType, l.Text)).ToList();
+            sourceLabel = loaded.PluginName;
+            if (rows.Count == 0)
+                return Task.FromResult<object?>(new { ok = false, error = "No lines are selected. Tick at least one VoiceType on the Plugin Dialogue page." });
+        }
+        else
+        {
+            try { rows = CsvService.ReadRows(req.CsvPath); }
+            catch (Exception ex) { return Task.FromResult<object?>(new { ok = false, error = $"Failed to parse CSV: {ex.Message}" }); }
+            sourceLabel = req.CsvPath;
+        }
 
         var voiceMap = new Dictionary<string, VoiceMapEntry>(StringComparer.OrdinalIgnoreCase);
         foreach (var e in req.VoiceMap)
@@ -468,7 +590,7 @@ internal sealed class ApiBridge
         _batchRunning = true;
 
         string pipelineNote = options.GenerateFuz ? " (with LIP + FUZ generation)" : options.GenerateLip ? " (with LIP generation)" : "";
-        PushLog($"Starting batch: {rows.Count} row(s) from {req.CsvPath}{pipelineNote}");
+        PushLog($"Starting batch: {rows.Count} row(s) from {sourceLabel}{pipelineNote}");
         PushEvent("batchStarted", new { total = rows.Count });
 
         // Run the batch on a background task, decoupled from this RPC call --

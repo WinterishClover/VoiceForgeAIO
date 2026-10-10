@@ -12,10 +12,13 @@ Only the outside world is faked:
 No real TTS provider, GPU, WSL, FaceFXWrapper or xWMAEncode is exercised.
 
 ```
-dotnet build tests/e2e/E2E.Harness.csproj -c Debug -o tests/e2e/out
 npm i playwright            # once, anywhere on NODE_PATH
-node tests/e2e/verify.cjs   # set CHROMIUM_PATH if Playwright's browser isn't installed
+tests/e2e/run-all.sh        # builds the harness, runs both suites; set CHROMIUM_PATH if Playwright's browser isn't installed
 ```
 
-`verify.cjs` prints PASS/FAIL per behaviour (Voice Mapping edits, CSV import/export, batch
-progress/stop/failure log, local voices, restart persistence) and exits non-zero on any failure.
+- `verify.cjs` -- Voice Mapping edits, CSV import/export, batch progress/stop/failure log, local voices, restart persistence.
+- `verify-plugin.cjs` -- Plugin Dialogue: `PluginMaker.cs` writes real plugins with Mutagen (a master + a plugin covering Speaker,
+  GetIsVoiceType / GetIsAliasRef / GetIsID conditions, template NPCs, scenes, quest conditions, master quests, long-name file
+  shortening, a localized plugin with and without its Strings), then the suite drives the page: find, read, map, generate, export.
+
+Both print PASS/FAIL per behaviour and exit non-zero on any failure.

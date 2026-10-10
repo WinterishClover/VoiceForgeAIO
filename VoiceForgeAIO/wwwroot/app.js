@@ -1,5 +1,6 @@
 import { call, on } from "./bridge.js";
 import { initLocalVoices } from "./local-voices.js";
+import * as pluginPage from "./plugin-dialogue.js";
 
 // ==========================================================================
 // State
@@ -36,6 +37,11 @@ async function init() {
   applySettingsToForm(state.settings);
   renderVoiceMapTable();
   refreshSingleLineDropdowns();
+
+  wirePluginDialogue();
+  pluginPage.setFolders(state.settings.skyrimDataPath, state.settings.extraPluginFolder);
+  // Find Skyrim and list its plugins in the background; the page is usable straight away.
+  pluginPage.startUp().catch((err) => appendLog(`Plugin list: ${err.message}`, "error"));
 
   // Local providers (OmniVoice, Qwen3-TTS) list the voices made on the Local Voices page.
   await initLocalVoices(onLocalVoicesChanged).catch((err) => appendLog(`Local voices: ${err.message}`, "error"));
@@ -142,14 +148,23 @@ function voiceLabel(name, id) {
   return GUID_LIKE.test(id) ? name : `${name} [${id}]`;
 }
 
+let statusTimer = null;
+/** The Plugin Dialogue page shows each VoiceType's mapping; keep it current as the table changes. */
+function refreshPluginStatusSoon() {
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => pluginPage.refreshMappingStatus(), 200);
+}
+
 function markDirty() {
   mappingDirty = true;
   document.getElementById("save-mapping-btn").textContent = "Save Mapping *";
+  refreshPluginStatusSoon();
 }
 
 function markClean() {
   mappingDirty = false;
   document.getElementById("save-mapping-btn").textContent = "Save Mapping";
+  refreshPluginStatusSoon();
 }
 
 function updateVoiceBadge(fromCache = false) {
@@ -478,6 +493,7 @@ function updateFuzCheckboxState() {
 async function startBatch() {
   if (batchRunning) return;
 
+  const fromPlugin = document.getElementById("batch-source").value === "plugin";
   const csvPath = document.getElementById("batch-csv-path").value.trim();
   const voiceFolder = document.getElementById("batch-voice-folder").value.trim();
   const generateLip = document.getElementById("batch-lip").checked;
@@ -487,7 +503,8 @@ async function startBatch() {
   const xwmaEncodePath = document.getElementById("xwma-path").value.trim();
   const lipFuzerPath = document.getElementById("lipfuzer-path").value.trim();
 
-  if (!csvPath) return alert("Select a valid CSV file first.");
+  if (fromPlugin && !pluginPage.isLoaded()) return alert("Read a plugin on the Plugin Dialogue page first.");
+  if (!fromPlugin && !csvPath) return alert("Select a valid CSV file first.");
   if (!voiceFolder) return alert("Select the mod's Voice folder first.");
   if (generateLip && (!faceFxWrapperPath || !fonixDataPath))
     return alert("LIP generation is checked, but FaceFXWrapper.exe / FonixData.cdf aren't set in Settings.");
@@ -511,6 +528,8 @@ async function startBatch() {
 
   const result = await call("startBatch", {
     csvPath, voiceFolder,
+    source: fromPlugin ? "plugin" : "csv",
+    includeVoiceTypes: fromPlugin ? pluginPage.includedVoiceTypes() : null,
     concurrency: Number(document.getElementById("batch-concurrency").value) || 3,
     overwrite: document.getElementById("batch-overwrite").checked,
     generateLip, generateFuz,
@@ -545,6 +564,60 @@ async function togglePauseBatch() {
 
 async function stopBatch() {
   await call("stopBatch");
+}
+
+// ==========================================================================
+// Plugin Dialogue <-> Voice Mapping / CSV Batch
+// ==========================================================================
+
+function goToPage(pageId) {
+  document.querySelector(`.nav-item[data-page="${pageId}"]`)?.click();
+}
+
+function wirePluginDialogue() {
+  pluginPage.initPluginDialogue({
+    getVoiceMap: () => voiceMap,
+    getProviders: () => providers,
+    appendLog,
+    goToPage,
+    persistSettings: () => saveAllSettings(true).catch(() => {}),
+    addVoiceTypes(names) {
+      // New rows start on the provider used by the last row, since a mod usually uses one provider for most of its voices.
+      const providerId = voiceMap.length ? voiceMap[voiceMap.length - 1].providerId : (providers[0]?.id || "");
+      for (const name of names) voiceMap.push({ voiceType: name, providerId, voiceId: "", voiceDisplay: "" });
+      renderVoiceMapTable();
+      markDirty();
+    },
+    onPluginLoaded() {
+      document.getElementById("batch-source-plugin-option").disabled = false;
+      // Offer the folder the game reads the voice files from, unless the user has already chosen one for this mod.
+      const folder = pluginPage.suggestedVoiceFolder();
+      const field = document.getElementById("batch-voice-folder");
+      if (folder && (!field.value.trim() || /[\\/]Sound[\\/]Voice[\\/][^\\/]+\.(esp|esm|esl)$/i.test(field.value.trim()))) field.value = folder;
+      updateBatchSource();
+      pluginPage.refreshMappingStatus();
+    },
+    onPluginSelectionChanged: updateBatchSource,
+    useForBatch() {
+      document.getElementById("batch-source").value = "plugin";
+      updateBatchSource();
+      goToPage("batch-page");
+    }
+  });
+}
+
+/** Shows the CSV box or the plugin summary, depending on where the batch's lines come from. */
+function updateBatchSource() {
+  const select = document.getElementById("batch-source");
+  if (select.value === "plugin" && !pluginPage.isLoaded()) select.value = "csv";
+  const fromPlugin = select.value === "plugin";
+  document.getElementById("batch-csv-row").classList.toggle("hidden", fromPlugin);
+  document.getElementById("batch-csv-format-hint").classList.toggle("hidden", fromPlugin);
+  const info = document.getElementById("batch-plugin-info");
+  info.classList.toggle("hidden", !fromPlugin);
+  if (fromPlugin)
+    info.textContent = `${pluginPage.pluginName()}: ${pluginPage.selectedLineCount().toLocaleString()} line(s) from the VoiceTypes ticked on the Plugin Dialogue page. ` +
+      `Finished files go to Mod Voice Folder below (the game reads Data\\Sound\\Voice\\${pluginPage.pluginName()}\\<VoiceType>\\).`;
 }
 
 // ==========================================================================
@@ -592,7 +665,8 @@ function wireStaticHandlers() {
     document.querySelectorAll(".provider-key-input").forEach((input) => (input.type = type));
   });
 
-  document.getElementById("save-settings-btn").addEventListener("click", saveAllSettings);
+  document.getElementById("save-settings-btn").addEventListener("click", () => saveAllSettings());
+  document.getElementById("batch-source").addEventListener("change", updateBatchSource);
 
   document.getElementById("refresh-voices-btn").addEventListener("click", () =>
     withButtonBusy("refresh-voices-btn", refreshAllVoices));
@@ -649,7 +723,7 @@ function wireStaticHandlers() {
   on("batchDone", () => setBatchControlsEnabled(true));
 }
 
-async function saveAllSettings() {
+async function saveAllSettings(silent = false) {
   const providerKeysNow = collectProviderKeysFromForm();
   await call("saveSettings", {
     providerKeys: providerKeysNow,
@@ -662,9 +736,11 @@ async function saveAllSettings() {
     concurrency: Number(document.getElementById("batch-concurrency").value) || 3,
     lipGenerationEnabled: document.getElementById("batch-lip").checked,
     fuzGenerationEnabled: document.getElementById("batch-fuz").checked,
-    lastProviderId: document.getElementById("single-provider").value
+    lastProviderId: document.getElementById("single-provider").value,
+    skyrimDataPath: pluginPage.dataFolder(),
+    extraPluginFolder: pluginPage.extraFolder()
   });
-  appendLog("Settings saved.", "ok");
+  if (!silent) appendLog("Settings saved.", "ok");
 }
 
 async function withButtonBusy(buttonId, fn) {

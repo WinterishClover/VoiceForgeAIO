@@ -477,3 +477,13 @@ table.grid select:focus, table.grid input[type="text"]:focus { border-color: var
 table.grid select.warn { outline: 1.5px solid var(--warn); outline-offset: -1px; background: rgba(201, 138, 43, 0.12); }
 table.grid tbody tr { cursor: default; user-select: none; }
 table.grid tbody tr input[type="text"] { user-select: text; }
+
+/* Plugin Dialogue page */
+#plugin-list { width: 100%; font-size: 13px; padding: 4px; }
+#plugin-list option { padding: 3px 6px; }
+.plugin-warnings { margin: 8px 0; }
+.plugin-warnings div { font-size: 12px; color: var(--charcoal); background: rgba(201, 138, 43, 0.15); border-left: 3px solid var(--warn); padding: 5px 9px; margin-bottom: 5px; border-radius: 3px; }
+.unmapped { color: var(--warn); font-weight: 600; }
+.mapped { color: var(--ok); }
+table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.grid td.wrap { white-space: normal; word-break: break-word; }

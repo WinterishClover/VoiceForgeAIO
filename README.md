@@ -19,6 +19,39 @@ Install steps: [docs/omnivoice.md](docs/omnivoice.md) and
 [docs/qwen3-tts.md](docs/qwen3-tts.md). The Python bridge scripts they use
 live in `VoiceForgeAIO/tools/` and ship next to the exe.
 
+## Read dialogue straight from a plugin (no xEdit, no CSV)
+
+The **Plugin Dialogue** page reads a mod's voiced lines directly from its `.esp` / `.esm` / `.esl`,
+the way StoryLoom does, so the xEdit exporter scripts and CSV step are optional now:
+
+1. **Where are your plugins?** VoiceForge AIO auto-detects the Skyrim Special Edition **Data**
+   folder (Steam, GOG or the Bethesda registry entry); otherwise type or Browse to it. For Mod
+   Organizer 2, also set the **extra plugin folder** to its `mods` folder (each mod's folder is
+   scanned). The folders are remembered. **Open a plugin file...** reads one from anywhere.
+2. **Choose a plugin** from the list (Skyrim's own files and Creation Club content are hidden unless
+   you ask for them) and **Read dialogue**. Masters are loaded from the same folders so speakers
+   defined in Skyrim.esm and other masters resolve.
+3. **Voice types**: every line is grouped by VoiceType with its line count, speakers and current
+   Voice Mapping. Untick any you don't want voiced. **Add missing VoiceTypes to Voice Mapping**
+   creates the rows; pick a provider and voice for each.
+4. **Generate audio for ticked VoiceTypes** switches CSV Batch Generate to the plugin as its source
+   (everything there -- LIP, FUZ, overwrite, pause/stop, `_failures.csv` -- works the same). The output
+   folder is suggested as `Data\Sound\Voice\<Plugin>`; change it if you'd rather not write into
+   Data directly.
+
+How a line's VoiceType is found matches the xEdit exporters: the INFO's **Speaker**, then its
+**GetIsVoiceType**, **GetIsAliasRef** and **GetIsID** conditions (in that order), then the quest's
+dialogue conditions; topics a **scene** plays use the scene action's actor alias. An NPC without a
+voice of its own that takes its traits from a template uses the template's. Lines with no speaker the
+plugin can resolve are listed as `Unknown` (unticked). File names are
+`Quest_Topic_FormID_Response`, with the quest and topic EditorIDs shortened to fit 25 characters the
+way the exporters do. **Export as CSV** writes the same rows as the scripts, if you still want a file.
+
+Notes: only Skyrim Special Edition plugins are read. **Localized** plugins keep their text in
+`Strings\*.STRINGS` files; they are read when that folder sits next to the plugin, otherwise you get a
+warning saying so (extract it from the `.bsa`). For light (ESL) plugins the FormID in the file name is
+the plugin's own 24-bit ID (e.g. `00000800`).
+
 ## Voice Mapping and batch fixes
 
 Found by running the app end to end (see `tests/e2e`):

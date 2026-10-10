@@ -43,6 +43,10 @@
       <aside class="sidebar" id="sidebar">
         <button class="sidebar-toggle" id="sidebar-toggle" title="Collapse">&#8249;</button>
         <nav class="sidebar-nav">
+          <button class="nav-item" data-page="plugin-dialogue-page" title="Plugin Dialogue">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2h9l4 4v16H6z"/><path d="M14 2v5h5M9 12h7M9 16h7"/></svg>
+            <span class="nav-label">Plugin Dialogue</span>
+          </button>
           <button class="nav-item active" data-page="voice-mapping-page" title="Voice Mapping">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h6M3 12l3-3M3 12l3 3M21 12h-6M21 12l-3-3M21 12l-3 3"/><circle cx="12" cy="12" r="2.4"/></svg>
             <span class="nav-label">Voice Mapping</span>
@@ -64,6 +68,79 @@
 
       <!-- ===================== Main content pages ===================== -->
       <main class="content-area" id="content-area">
+
+        <!-- ---- Plugin Dialogue page: read a mod's dialogue straight from its plugin (no xEdit, no CSV) ---- -->
+        <section class="page" id="plugin-dialogue-page">
+          <div class="page-header">
+            <h2>Plugin Dialogue</h2>
+            <span class="page-subtitle">Read a mod's voiced lines straight from its plugin &mdash; no xEdit script, no CSV</span>
+          </div>
+
+          <div class="card-body-plain" style="max-width: 980px;">
+            <h4 class="local-heading" style="margin-top:0;">1. Where are your plugins?</h4>
+            <div class="field-row">
+              <div class="grow">
+                <label class="field-label" for="plugin-data-path">Skyrim Data folder</label>
+                <input type="text" id="plugin-data-path" placeholder="C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data" />
+              </div>
+              <div class="fixed"><button class="secondary" data-browse-folder="plugin-data-path">Browse&hellip;</button></div>
+              <div class="fixed"><button class="secondary" id="plugin-detect-btn">Auto-detect</button></div>
+            </div>
+            <div class="field-row">
+              <div class="grow">
+                <label class="field-label" for="plugin-extra-path">Extra plugin folder (optional &mdash; e.g. Mod Organizer 2's <code>mods</code> folder)</label>
+                <input type="text" id="plugin-extra-path" />
+              </div>
+              <div class="fixed"><button class="secondary" data-browse-folder="plugin-extra-path">Browse&hellip;</button></div>
+            </div>
+            <div class="button-bar" style="margin-top:0;">
+              <button id="plugin-scan-btn">Find plugins</button>
+              <button class="secondary" id="plugin-open-btn">Open a plugin file&hellip;</button>
+            </div>
+            <div class="checkbox-row"><input type="checkbox" id="plugin-show-official" /><label for="plugin-show-official">Also list Skyrim's own files and Creation Club content</label></div>
+
+            <h4 class="local-heading">2. Choose a plugin</h4>
+            <div class="field-row">
+              <div class="grow"><input type="text" id="plugin-filter" placeholder="Filter plugins by name or folder&hellip;" /></div>
+              <div class="fixed"><button id="plugin-read-btn" disabled>Read dialogue</button></div>
+            </div>
+            <select id="plugin-list" size="9" style="height:auto;"></select>
+            <div class="field-hint" id="plugin-list-hint">Set the Data folder above and click Find plugins.</div>
+
+            <div id="plugin-result" class="hidden">
+              <h4 class="local-heading">3. Voice types in <span id="plugin-result-name"></span></h4>
+              <div id="plugin-summary" class="field-hint" style="margin-top:0;"></div>
+              <div id="plugin-warnings" class="plugin-warnings"></div>
+              <div class="grid-scroll grid-scroll-tall">
+                <table class="grid">
+                  <thead><tr>
+                    <th style="width:44px;"><input type="checkbox" id="plugin-vt-all" title="Select all / none" checked /></th>
+                    <th style="width:26%;">VoiceType</th><th style="width:70px;">Lines</th><th>Speakers</th><th style="width:28%;">Voice Mapping</th>
+                  </tr></thead>
+                  <tbody id="plugin-vt-body"></tbody>
+                </table>
+              </div>
+              <div class="button-bar">
+                <button id="plugin-add-mapping-btn">Add missing VoiceTypes to Voice Mapping</button>
+                <button id="plugin-generate-btn">Generate audio for ticked VoiceTypes &rarr;</button>
+                <button class="secondary" id="plugin-export-btn">Export as CSV&hellip;</button>
+              </div>
+
+              <h4 class="local-heading">Lines <span id="plugin-lines-count" class="local-state"></span></h4>
+              <div class="field-row">
+                <div class="grow"><input type="text" id="plugin-lines-search" placeholder="Search the text, file name or speaker&hellip;" /></div>
+                <div class="fixed"><button class="secondary" id="plugin-lines-clear-btn">Show all VoiceTypes</button></div>
+              </div>
+              <div class="grid-scroll grid-scroll-tall">
+                <table class="grid">
+                  <thead><tr><th style="width:24%;">File name</th><th style="width:16%;">VoiceType</th><th>Text</th></tr></thead>
+                  <tbody id="plugin-lines-body"></tbody>
+                </table>
+              </div>
+              <div class="button-bar"><button class="secondary" id="plugin-lines-more-btn">Show more</button></div>
+            </div>
+          </div>
+        </section>
 
         <!-- ---- Voice Mapping page ---- -->
         <section class="page active" id="voice-mapping-page">
@@ -150,7 +227,14 @@
           </div>
 
           <div class="card-body-plain" style="max-width: 760px;">
-            <div class="field-row">
+            <label class="field-label" for="batch-source">Dialogue to voice</label>
+            <select id="batch-source" style="margin-bottom:12px;">
+              <option value="csv">A CSV file</option>
+              <option value="plugin" id="batch-source-plugin-option" disabled>A plugin read on the Plugin Dialogue page</option>
+            </select>
+            <div id="batch-plugin-info" class="field-hint hidden" style="margin-top:-4px;"></div>
+
+            <div class="field-row" id="batch-csv-row">
               <div class="grow">
                 <label class="field-label" for="batch-csv-path">CSV File</label>
                 <input type="text" id="batch-csv-path" />
@@ -198,7 +282,7 @@
               <div class="progress-label" id="batch-progress-label">Progress: 0/0</div>
             </div>
 
-            <div class="field-hint" style="margin-top:12px;">CSV format (no header): EditorID,VoiceType,"Line text"</div>
+            <div class="field-hint" style="margin-top:12px;" id="batch-csv-format-hint">CSV format (no header): EditorID,VoiceType,"Line text"</div>
           </div>
         </section>
 
@@ -440,6 +524,21 @@
           the <strong>.lip</strong> file for facial animation and packaging
           everything into Bethesda's <strong>.fuz</strong> format, ready to drop
           straight into your mod's <code>Sound\Voice</code> folder.</p>
+
+        <h4>Easiest start: read the plugin directly (no xEdit, no CSV)</h4>
+        <p>Open <strong>Plugin Dialogue</strong>. VoiceForge AIO finds your Skyrim
+          <strong>Data</strong> folder (or you point it there; if you use Mod Organizer,
+          also give it the <code>mods</code> folder), lists your plugins, and reads the one
+          you pick &mdash; every voiced line, with the speaker's VoiceType worked out the
+          same way the xEdit scripts do it (the line's Speaker, then its voice-type, alias and
+          ID conditions, then the quest's; scenes use their actor alias). Lines are grouped by
+          VoiceType. Click <strong>Add missing VoiceTypes to Voice Mapping</strong>, pick a
+          provider and voice for each, then <strong>Generate audio</strong>. Files are named
+          the way the game expects (<code>Quest_Topic_FormID_1</code>) and saved under your
+          mod's <code>Sound\Voice\YourMod.esp\&lt;VoiceType&gt;</code> folder. Voice types
+          listed as <em>Unknown</em> have no speaker the plugin can resolve (player lines,
+          for example) and start unticked. You can still <strong>Export as CSV</strong>, and the
+          CSV route below keeps working.</p>
 
         <h4>1. Add your API keys</h4>
         <p>Open <strong>Settings</strong> from the top menu and paste in the API

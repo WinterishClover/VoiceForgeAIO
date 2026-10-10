@@ -31,6 +31,7 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="Photino.NET" Version="4.0.16" />
+    <PackageReference Include="Mutagen.Bethesda.Skyrim" Version="0.53.1" />
   </ItemGroup>
 
   <!-- Ship the web UI assets alongside the exe. -->

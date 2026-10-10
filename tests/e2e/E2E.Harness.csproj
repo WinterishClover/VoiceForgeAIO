@@ -10,7 +10,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../VoiceForgeAIO/**/*.cs" Exclude="../../VoiceForgeAIO/obj/**;../../VoiceForgeAIO/bin/**;../../VoiceForgeAIO/Program.cs;../../VoiceForgeAIO/Providers/TtsProviderRegistry.cs" />
-    <Compile Include="Shim.cs;Host.cs;Registry.cs" />
+    <Compile Include="Shim.cs;Host.cs;Registry.cs;PluginMaker.cs" />
     <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="Mutagen.Bethesda.Skyrim" Version="0.53.1" />
   </ItemGroup>
 </Project>

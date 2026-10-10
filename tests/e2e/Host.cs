@@ -31,6 +31,8 @@ internal static class Host
                     if (path == "/rpc") { var body = await new StreamReader(req.InputStream).ReadToEndAsync(); _ = bridge.HandleMessageAsync(body, window); res.StatusCode = 204; }
                     else if (path == "/poll") { var sb = new List<string>(); for (int i = 0; i < 50 && Out.IsEmpty; i++) await Task.Delay(20); while (Out.TryDequeue(out var m)) sb.Add(m); var json = "[" + string.Join(",", sb.Select(s => System.Text.Json.JsonSerializer.Serialize(s))) + "]"; var b = Encoding.UTF8.GetBytes(json); res.ContentType = "application/json"; await res.OutputStream.WriteAsync(b); }
                     else if (path == "/test/dialog") { Dialogs.Enqueue(req.QueryString["v"] ?? ""); res.StatusCode = 204; }
+                    else if (path == "/test/makeplugin") { PluginMaker.Make(req.QueryString["dir"]!); res.StatusCode = 204; }
+                    else if (path == "/test/makelocalized") { PluginMaker.MakeLocalized(req.QueryString["dir"]!); res.StatusCode = 204; }
                     else if (path == "/test/fake") { FakeCloudProviderCtl(req.QueryString["voicesFail"]); res.StatusCode = 204; }
                     else if (path == "/test/calls") { var b = Encoding.UTF8.GetBytes(Providers.FakeCloudProvider.Calls.ToString()); await res.OutputStream.WriteAsync(b); }
                     else
