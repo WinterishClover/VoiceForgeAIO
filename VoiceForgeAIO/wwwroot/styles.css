@@ -472,3 +472,8 @@ table.grid select:focus, table.grid input[type="text"]:focus { border-color: var
 .trait-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 12px; margin-bottom: 10px; }
 .trait-grid .field-label { font-weight: 600; }
 .local-card-body > div:not(.field-row):not(.button-bar):not(.checkbox-row) { margin-bottom: 10px; }
+
+/* Voice Mapping: rows that will fail in a batch (no voice, unknown provider, voice no longer exists) */
+table.grid select.warn { outline: 1.5px solid var(--warn); outline-offset: -1px; background: rgba(201, 138, 43, 0.12); }
+table.grid tbody tr { cursor: default; user-select: none; }
+table.grid tbody tr input[type="text"] { user-select: text; }

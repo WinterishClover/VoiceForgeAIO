@@ -134,6 +134,9 @@ internal sealed class ApiBridge
                 lastProviderId = s.LastProviderId
             },
             voiceMap = PersistenceService.LoadVoiceMap().Select(ToWireVoiceMapEntry),
+            cachedVoices = PersistenceService.LoadVoiceCache().ToDictionary(
+                kv => kv.Key,
+                kv => kv.Value.Select(v => new { voiceId = v.VoiceId, displayName = v.DisplayName, description = v.Description })),
             hasSeenSplash = s.HasSeenSplash
         };
     }
@@ -233,6 +236,7 @@ internal sealed class ApiBridge
         var req = args.Deserialize<RefreshVoicesRequest>(JsonOpts) ?? new RefreshVoicesRequest();
         var byProvider = new Dictionary<string, object>();
         var errors = new Dictionary<string, string>();
+        var cache = PersistenceService.LoadVoiceCache();
 
         foreach (var provider in TtsProviderRegistry.All)
         {
@@ -248,6 +252,8 @@ internal sealed class ApiBridge
                 var creds = new ProviderCredentials { ApiKey = pair.ApiKey, GroupId = pair.GroupId };
                 var voices = await provider.ListVoicesAsync(creds);
                 byProvider[provider.Id] = voices.Select(v => new { voiceId = v.VoiceId, displayName = v.DisplayName, description = v.Description });
+                if (provider.RequiresApiKey)
+                    cache[provider.Id] = voices.Select(v => new CachedVoice { VoiceId = v.VoiceId, DisplayName = v.DisplayName, Description = v.Description }).ToList();
                 PushLog($"{provider.DisplayName}: {voices.Count} voice(s) loaded.");
             }
             catch (Exception ex)
@@ -256,6 +262,9 @@ internal sealed class ApiBridge
                 PushLog($"{provider.DisplayName} failed: {ex.Message}");
             }
         }
+
+        try { PersistenceService.SaveVoiceCache(cache); }
+        catch (Exception ex) { PushLog($"Could not remember the voice lists: {ex.Message}"); }
 
         return new { voicesByProvider = byProvider, errors };
     }
@@ -283,13 +292,15 @@ internal sealed class ApiBridge
     private object SaveVoiceMap(JsonElement args)
     {
         var entries = args.GetProperty("entries").Deserialize<List<WireVoiceMapEntry>>(JsonOpts) ?? new();
-        var list = entries.Select(e => new VoiceMapEntry
-        {
-            VoiceType = e.VoiceType,
-            ProviderId = e.ProviderId,
-            VoiceId = e.VoiceId,
-            VoiceDisplay = e.VoiceDisplay
-        }).ToList();
+        var list = entries
+            .Where(e => !string.IsNullOrWhiteSpace(e.VoiceType))
+            .Select(e => new VoiceMapEntry
+            {
+                VoiceType = e.VoiceType.Trim(),
+                ProviderId = e.ProviderId,
+                VoiceId = e.VoiceId,
+                VoiceDisplay = e.VoiceDisplay
+            }).ToList();
         PersistenceService.SaveVoiceMap(list);
         return new { ok = true, count = list.Count };
     }
@@ -306,27 +317,64 @@ internal sealed class ApiBridge
         return new { ok = true, count = entries.Count };
     }
 
+    /// <summary>The registered provider id for a name typed in any case ("elevenlabs" -> "ElevenLabs"), or null.</summary>
+    private static string? CanonicalProviderId(string name) =>
+        TtsProviderRegistry.All.FirstOrDefault(p => p.Id.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase))?.Id;
+
+    /// <summary>
+    /// Reads a mapping CSV. Understands the current format (VoiceType,ProviderId,VoiceId,VoiceDisplay)
+    /// and the older one without a Provider column (VoiceType,VoiceId,VoiceDisplay): for those rows the
+    /// provider is left blank and flagged, because the file can't say which provider the voice belongs to.
+    /// </summary>
     private object ImportVoiceMapCsv(JsonElement args)
     {
         string path = args.GetProperty("path").GetString() ?? throw new InvalidOperationException("Missing path.");
-        var imported = new List<WireVoiceMapEntry>();
+        var imported = new List<object>();
+        var warnings = new List<string>();
 
-        foreach (string raw in File.ReadAllLines(path))
+        bool? headerHasProvider = null;
+        bool firstRecord = true;
+        foreach (var (lineNum, fields) in CsvService.ParseRecords(File.ReadAllText(path)))
         {
-            if (string.IsNullOrWhiteSpace(raw)) continue;
-            var fields = CsvService.ParseLine(raw);
-            if (fields.Count < 3) continue;
-            if (fields[0].Trim().Equals("VoiceType", StringComparison.OrdinalIgnoreCase)) continue;
+            if (fields.Count < 3) { warnings.Add($"Line {lineNum}: skipped (expected at least 3 columns)."); continue; }
 
-            imported.Add(new WireVoiceMapEntry
+            if (firstRecord && fields[0].Trim().Equals("VoiceType", StringComparison.OrdinalIgnoreCase))
             {
-                VoiceType = fields[0].Trim(),
-                ProviderId = fields[1].Trim(),
-                VoiceId = fields[2].Trim(),
-                VoiceDisplay = fields.Count >= 4 ? fields[3].Trim() : ""
-            });
+                headerHasProvider = fields[1].Trim().Equals("ProviderId", StringComparison.OrdinalIgnoreCase)
+                                    || fields[1].Trim().Equals("Provider", StringComparison.OrdinalIgnoreCase);
+                firstRecord = false;
+                continue;
+            }
+            firstRecord = false;
+
+            string voiceType = fields[0].Trim();
+            if (voiceType.Length == 0) { warnings.Add($"Line {lineNum}: skipped (empty VoiceType)."); continue; }
+
+            string? providerId = CanonicalProviderId(fields[1]);
+            // With a header the format is known; without one, a recognised provider name in column 2 means the current format.
+            bool currentFormat = headerHasProvider ?? (providerId != null && fields.Count >= 3);
+
+            if (currentFormat)
+            {
+                if (providerId == null)
+                    warnings.Add($"Line {lineNum}: '{voiceType}' uses an unknown provider '{fields[1].Trim()}'; pick its provider in the table.");
+                imported.Add(new
+                {
+                    voiceType, providerId = providerId ?? "", voiceId = fields[2].Trim(),
+                    voiceDisplay = fields.Count >= 4 ? fields[3].Trim() : "", needsProvider = providerId == null
+                });
+            }
+            else
+            {
+                warnings.Add($"Line {lineNum}: '{voiceType}' is in the older format with no Provider column; pick its provider in the table.");
+                imported.Add(new
+                {
+                    voiceType, providerId = "", voiceId = fields[1].Trim(),
+                    voiceDisplay = fields[2].Trim(), needsProvider = true
+                });
+            }
         }
-        return new { entries = imported };
+        return new { entries = imported, warnings };
     }
 
     // ------------------------------------------------------------------
@@ -444,11 +492,14 @@ internal sealed class ApiBridge
             try
             {
                 var (success, failed, skipped, failures) = await processor.RunAsync(rows, voiceMap, options, progress, pauseGate, cts.Token);
-                PushLog($"Batch finished. Success: {success}, Failed: {failed}, Skipped: {skipped}.");
+                bool stopped = cts.IsCancellationRequested;
+                PushLog(stopped
+                    ? $"Batch stopped by user. Made: {success}, Failed: {failed}, Skipped: {skipped}. Run it again to continue; finished lines are skipped."
+                    : $"Batch finished. Success: {success}, Failed: {failed}, Skipped: {skipped}.");
 
+                string failLog = Path.Combine(req.VoiceFolder, "_failures.csv");
                 if (failures.Count > 0)
                 {
-                    string failLog = Path.Combine(req.VoiceFolder, "_failures.csv");
                     try
                     {
                         await CsvService.WriteFailuresAsync(failLog, failures);
@@ -456,8 +507,13 @@ internal sealed class ApiBridge
                     }
                     catch (Exception ex) { PushLog($"Could not write failure log: {ex.Message}"); }
                 }
+                else if (!stopped && File.Exists(failLog))
+                {
+                    // A clean run: the failure list from an earlier run no longer applies.
+                    try { File.Delete(failLog); } catch { /* best-effort */ }
+                }
 
-                PushEvent("batchDone", new { success, failed, skipped, failureCount = failures.Count });
+                PushEvent("batchDone", new { success, failed, skipped, failureCount = failures.Count, cancelled = stopped });
             }
             catch (OperationCanceledException)
             {

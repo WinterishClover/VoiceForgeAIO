@@ -129,7 +129,7 @@ public sealed class Qwen3TtsService : IDisposable
         voice.Kind = voice.Kind is "clone" or "preset" ? voice.Kind : "design";
         voice.Instruct = Regex.Replace(voice.Instruct ?? "", @"\s+", " ").Trim();
         voice.Language = Languages.Contains(voice.Language ?? "", StringComparer.OrdinalIgnoreCase) ? Languages.First(l => l.Equals(voice.Language, StringComparison.OrdinalIgnoreCase)) : "English";
-        voice.Speaker = Speakers.Contains(voice.Speaker ?? "") ? voice.Speaker : "Ryan";
+        voice.Speaker = Speakers.Contains(voice.Speaker ?? "") ? voice.Speaker! : "Ryan";
         voice.ReferenceText = (voice.ReferenceText ?? "").Trim();
         if (voice.Kind == "design" && voice.Instruct.Length == 0) throw new InvalidOperationException("Describe the voice in your own words (for example: a gruff old man with a slow, tired voice), or choose another kind.");
         if (existing is not null) { voice.ReferenceFile = voice.ReferenceFile.Length > 0 ? voice.ReferenceFile : existing.ReferenceFile; _store.Voices.Remove(existing); }

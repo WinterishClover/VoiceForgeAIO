@@ -27,6 +27,14 @@ internal sealed class StoredProviderCredentials
     public string GroupId { get; set; } = ""; // only MiniMax uses this
 }
 
+/// <summary>One provider voice remembered from the last "Get Available Voices", so mappings work after a restart without another network call.</summary>
+internal sealed class CachedVoice
+{
+    public string VoiceId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string Description { get; set; } = "";
+}
+
 internal sealed class AppSettingsModel
 {
     public List<StoredProviderCredentials> ProviderCredentials { get; set; } = new();

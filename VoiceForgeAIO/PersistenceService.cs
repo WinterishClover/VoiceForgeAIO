@@ -19,6 +19,7 @@ internal static class PersistenceService
 
     private static readonly string SettingsPath = Path.Combine(AppDataDir, "settings.json");
     private static readonly string VoiceMapPath = Path.Combine(AppDataDir, "voice_map.json");
+    private static readonly string VoiceCachePath = Path.Combine(AppDataDir, "voice_cache.json");
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
@@ -95,6 +96,30 @@ internal static class PersistenceService
     public static void SaveVoiceMap(List<VoiceMapEntry> map)
     {
         EnsureDir();
-        File.WriteAllText(VoiceMapPath, JsonSerializer.Serialize(map, JsonOptions));
+        // Write to a temp file and swap, so a crash mid-save can't leave a half-written (unreadable) mapping.
+        string tmp = VoiceMapPath + ".tmp";
+        File.WriteAllText(tmp, JsonSerializer.Serialize(map, JsonOptions));
+        File.Move(tmp, VoiceMapPath, true);
+    }
+
+    // ---- Remembered voice lists (cloud providers) -----------------------
+
+    public static Dictionary<string, List<CachedVoice>> LoadVoiceCache()
+    {
+        try
+        {
+            if (!File.Exists(VoiceCachePath)) return new();
+            return JsonSerializer.Deserialize<Dictionary<string, List<CachedVoice>>>(File.ReadAllText(VoiceCachePath)) ?? new();
+        }
+        catch
+        {
+            return new();
+        }
+    }
+
+    public static void SaveVoiceCache(Dictionary<string, List<CachedVoice>> cache)
+    {
+        EnsureDir();
+        File.WriteAllText(VoiceCachePath, JsonSerializer.Serialize(cache, JsonOptions));
     }
 }

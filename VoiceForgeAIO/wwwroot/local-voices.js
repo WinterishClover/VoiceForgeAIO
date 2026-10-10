@@ -19,6 +19,7 @@ function createCard(p) {
   let currentId = "";
   let audio = null;
   let busy = false;
+  let loaded = false;
 
   const current = () => state.voices.find((v) => v.id === currentId);
 
@@ -29,7 +30,7 @@ function createCard(p) {
   }
 
   async function guard(button, messageId, work) {
-    if (busy) return;
+    if (busy) { say(messageId, "Still working on the previous action… wait for it to finish.", true); return; }
     busy = true;
     if (button) button.disabled = true;
     try { await work(); } catch (e) { say(messageId, e.message, true); } finally { busy = false; if (button) button.disabled = false; }
@@ -64,7 +65,7 @@ function createCard(p) {
     onVoicesChanged(p.providerId, state.voices.map((v) => ({ voiceId: v.id, displayName: v.name, description: v.instruct || v.kind })));
   }
 
-  async function load() { apply(await call(p.method + ".get")); }
+  async function load() { apply(await call(p.method + ".get")); loaded = true; }
 
   id("SaveButton").addEventListener("click", (e) => guard(e.currentTarget, id("Message").id, async () => {
     apply(await call(p.method + ".save", { settings: { ...state.settings, pythonPath: id("Python").value.trim(), useWsl: id("Wsl").checked, wslDistro: id("Distro").value.trim(), idleMinutes: Number(id("Idle").value) || 10 } }));
@@ -133,7 +134,8 @@ function createCard(p) {
   }));
 
   $(p.prefix + "Section").addEventListener("toggle", () => {
-    if ($(p.prefix + "Section").open) load().catch((e) => say(id("Message").id, e.message, true));
+    // Already loaded at start-up; reloading now would overwrite anything typed since.
+    if ($(p.prefix + "Section").open && !loaded) load().catch((e) => say(id("Message").id, e.message, true));
   });
 
   return { load };

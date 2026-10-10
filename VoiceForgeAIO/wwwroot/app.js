@@ -11,6 +11,9 @@ let voiceMap = [];           // [{voiceType, providerId, voiceId, voiceDisplay}]
 let voicesByProvider = {};   // {providerId: [{voiceId, displayName, description}]}
 let batchRunning = false;
 let batchPaused = false;
+let selectedRows = new Set(); // indices of selected Voice Mapping rows
+let lastClickedRow = -1;
+let mappingDirty = false;     // edited since the last Save Mapping
 
 const providerById = (id) => providers.find((p) => p.id === id);
 
@@ -25,6 +28,8 @@ async function init() {
   providers = Array.from(state.providers);
   providerKeys = state.providerKeys;
   voiceMap = Array.from(state.voiceMap);
+  // Voices fetched on an earlier run, so mappings are usable straight away (Get Available Voices refreshes them).
+  voicesByProvider = Object.fromEntries(Object.entries(state.cachedVoices || {}).map(([id, list]) => [id, Array.from(list)]));
 
   renderProviderKeyRows();
   renderProviderSelect(document.getElementById("single-provider"));
@@ -39,6 +44,7 @@ async function init() {
     document.getElementById("splash-overlay").classList.add("hidden");
   }
 
+  updateVoiceBadge(Object.keys(state.cachedVoices || {}).length > 0);
   appendLog('Ready. Enter your API keys in Settings, then "Get Available Voices" before building the Voice Mapping table.');
 }
 
@@ -128,45 +134,106 @@ function renderProviderSelect(selectEl) {
 // Voice mapping table
 // ==========================================================================
 
+const GUID_LIKE = /^[0-9a-f]{32}$/i;
+
+/** "Name [id]" for provider voices; local voices have an opaque generated id, so only the name is shown. */
+function voiceLabel(name, id) {
+  if (!name) return id ? `[${id}]` : "";
+  return GUID_LIKE.test(id) ? name : `${name} [${id}]`;
+}
+
+function markDirty() {
+  mappingDirty = true;
+  document.getElementById("save-mapping-btn").textContent = "Save Mapping *";
+}
+
+function markClean() {
+  mappingDirty = false;
+  document.getElementById("save-mapping-btn").textContent = "Save Mapping";
+}
+
+function updateVoiceBadge(fromCache = false) {
+  let total = 0;
+  for (const id in voicesByProvider) total += voicesByProvider[id].length;
+  const providersWithVoices = Object.keys(voicesByProvider).filter((id) => voicesByProvider[id].length > 0).length;
+  const badge = document.getElementById("voice-count-badge");
+  badge.textContent = total === 0
+    ? "No voices loaded yet"
+    : `${total} voice(s) across ${providersWithVoices} provider(s)${fromCache ? " (remembered from last time)" : ""}`;
+}
+
 function renderVoiceMapTable() {
   const tbody = document.getElementById("voice-map-body");
   tbody.innerHTML = "";
   voiceMap.forEach((entry, index) => tbody.appendChild(buildVoiceMapRow(entry, index)));
+  applySelection();
+}
+
+/** Click selects a row; Ctrl/Cmd-click adds or removes one; Shift-click selects the range from the last click. */
+function onRowClick(e, index) {
+  if (e.shiftKey && lastClickedRow >= 0) {
+    const [from, to] = [Math.min(lastClickedRow, index), Math.max(lastClickedRow, index)];
+    selectedRows = new Set(Array.from({ length: to - from + 1 }, (_, i) => from + i));
+  } else if (e.ctrlKey || e.metaKey) {
+    if (!selectedRows.delete(index)) selectedRows.add(index);
+    lastClickedRow = index;
+  } else {
+    selectedRows = new Set([index]);
+    lastClickedRow = index;
+  }
+  applySelection();
+}
+
+function applySelection() {
+  document.querySelectorAll("#voice-map-body tr").forEach((tr) =>
+    tr.classList.toggle("selected", selectedRows.has(Number(tr.dataset.index))));
 }
 
 function buildVoiceMapRow(entry, index) {
   const tr = document.createElement("tr");
   tr.dataset.index = String(index);
+  tr.addEventListener("click", (e) => onRowClick(e, index));
 
   const typeTd = document.createElement("td");
   const typeInput = document.createElement("input");
   typeInput.type = "text";
   typeInput.value = entry.voiceType;
   typeInput.placeholder = "e.g. Kaylin";
-  typeInput.addEventListener("input", () => { voiceMap[index].voiceType = typeInput.value; });
-  typeInput.addEventListener("click", () => selectRow(tr));
+  typeInput.addEventListener("input", () => { voiceMap[index].voiceType = typeInput.value; markDirty(); });
+  // Stray spaces would make the name never match the CSV's VoiceType column.
+  typeInput.addEventListener("change", () => {
+    typeInput.value = typeInput.value.trim();
+    voiceMap[index].voiceType = typeInput.value;
+  });
   typeTd.appendChild(typeInput);
 
   const providerTd = document.createElement("td");
   const providerSelect = document.createElement("select");
-  providerSelect.innerHTML = providers.map((p) => `<option value="${p.id}">${p.displayName}</option>`).join("");
-  providerSelect.value = entry.providerId || providers[0]?.id || "";
-  providerSelect.addEventListener("click", () => selectRow(tr));
+  const known = providers.some((p) => p.id === entry.providerId);
+  providerSelect.innerHTML =
+    (!known && entry.providerId ? `<option value="${escapeAttr(entry.providerId)}">${escapeHtml(entry.providerId)} (unknown provider)</option>` : "") +
+    (!known && !entry.providerId ? `<option value="">-- select a provider --</option>` : "") +
+    providers.map((p) => `<option value="${p.id}">${p.displayName}</option>`).join("");
+  providerSelect.value = entry.providerId || (known ? entry.providerId : "");
+  providerSelect.classList.toggle("warn", !known);
   providerSelect.addEventListener("change", () => {
     voiceMap[index].providerId = providerSelect.value;
     voiceMap[index].voiceId = "";
     voiceMap[index].voiceDisplay = "";
+    providerSelect.classList.toggle("warn", !providers.some((p) => p.id === providerSelect.value));
     rebuildVoiceSelect(voiceSelect, voiceMap[index]);
+    markDirty();
   });
   providerTd.appendChild(providerSelect);
 
   const voiceTd = document.createElement("td");
   const voiceSelect = document.createElement("select");
-  voiceSelect.addEventListener("click", () => selectRow(tr));
   voiceSelect.addEventListener("change", () => {
     const opt = voiceSelect.selectedOptions[0];
     voiceMap[index].voiceId = voiceSelect.value;
     voiceMap[index].voiceDisplay = opt ? opt.dataset.display || "" : "";
+    voiceSelect.classList.toggle("warn", !voiceSelect.value || voiceSelect.selectedOptions[0]?.dataset.missing === "1");
+    markDirty();
   });
   rebuildVoiceSelect(voiceSelect, entry);
   voiceTd.appendChild(voiceSelect);
@@ -179,49 +246,93 @@ function buildVoiceMapRow(entry, index) {
 
 /** Populates a row's Voice <select> from the cached voice list for its current
  *  Provider, always including the row's current value even if it's not (yet)
- *  in that list, so a persisted mapping never displays blank. */
+ *  in that list, so a persisted mapping never displays blank. A saved voice that
+ *  is no longer in a loaded list (deleted, or removed by the provider) is flagged. */
 function rebuildVoiceSelect(selectEl, entry) {
   const voices = voicesByProvider[entry.providerId] || [];
   const options = [];
+  let missing = false;
 
   if (entry.voiceId) {
     const known = voices.find((v) => v.voiceId === entry.voiceId);
-    const label = known ? `${known.displayName} [${known.voiceId}]` : (entry.voiceDisplay ? `${entry.voiceDisplay} [${entry.voiceId}]` : `[${entry.voiceId}]`);
-    options.push(`<option value="${escapeAttr(entry.voiceId)}" data-display="${escapeAttr(entry.voiceDisplay || (known ? known.displayName : ""))}" selected>${escapeHtml(label)}</option>`);
+    // A local provider's list is always complete (even when empty); a cloud list may simply not be loaded yet.
+    missing = !known && (voices.length > 0 || providerById(entry.providerId)?.requiresApiKey === false);
+    const name = known ? known.displayName : entry.voiceDisplay;
+    const label = voiceLabel(name, entry.voiceId) + (missing ? "  (not found - pick another)" : "");
+    options.push(`<option value="${escapeAttr(entry.voiceId)}" data-display="${escapeAttr(entry.voiceDisplay || (known ? known.displayName : ""))}" data-missing="${missing ? 1 : 0}" selected>${escapeHtml(label)}</option>`);
   } else {
     options.push(`<option value="" data-display="">-- select a voice --</option>`);
   }
 
   for (const v of voices) {
     if (v.voiceId === entry.voiceId) continue; // already added above as the selected option
-    const label = `${v.displayName} [${v.voiceId}]`;
-    options.push(`<option value="${escapeAttr(v.voiceId)}" data-display="${escapeAttr(v.displayName)}">${escapeHtml(label)}</option>`);
+    options.push(`<option value="${escapeAttr(v.voiceId)}" data-display="${escapeAttr(v.displayName)}">${escapeHtml(voiceLabel(v.displayName, v.voiceId))}</option>`);
   }
 
   selectEl.innerHTML = options.join("");
-}
-
-function selectRow(tr) {
-  document.querySelectorAll("#voice-map-body tr.selected").forEach((r) => r.classList.remove("selected"));
-  tr.classList.add("selected");
+  selectEl.classList.toggle("warn", !entry.voiceId || missing);
 }
 
 function addVoiceMapRow() {
   voiceMap.push({ voiceType: "", providerId: providers[0]?.id || "", voiceId: "", voiceDisplay: "" });
+  selectedRows = new Set([voiceMap.length - 1]);
+  lastClickedRow = voiceMap.length - 1;
   renderVoiceMapTable();
+  markDirty();
+  // Ready to type the new VoiceType.
+  const inputs = document.querySelectorAll("#voice-map-body tr input");
+  inputs[inputs.length - 1]?.focus();
 }
 
 function removeSelectedRows() {
-  const selected = document.querySelectorAll("#voice-map-body tr.selected");
-  const indices = new Set([...selected].map((tr) => Number(tr.dataset.index)));
-  voiceMap = voiceMap.filter((_, i) => !indices.has(i));
+  if (selectedRows.size === 0) {
+    appendLog("Select one or more rows first (click a row; Ctrl-click or Shift-click for several), then Remove Selected.", "error");
+    return;
+  }
+  const count = selectedRows.size;
+  voiceMap = voiceMap.filter((_, i) => !selectedRows.has(i));
+  selectedRows = new Set();
+  lastClickedRow = -1;
   renderVoiceMapTable();
+  markDirty();
+  appendLog(`Removed ${count} row(s). Click Save Mapping to keep the change.`);
+}
+
+/** Names that differ only by letter case are the same VoiceType to the batch, so they can't both be mapped. */
+function findDuplicateVoiceTypes(entries) {
+  const seen = new Map();
+  const dupes = new Set();
+  for (const e of entries) {
+    const key = e.voiceType.trim().toLowerCase();
+    if (seen.has(key)) dupes.add(seen.get(key)); else seen.set(key, e.voiceType.trim());
+  }
+  return [...dupes];
+}
+
+/** Logs rows that will fail in a batch. Returns the number of problems. */
+function reportMappingProblems(entries) {
+  let problems = 0;
+  for (const e of entries) {
+    const name = e.voiceType.trim();
+    if (!providers.some((p) => p.id === e.providerId)) { appendLog(`Warning: '${name}' has no valid provider selected.`, "error"); problems++; }
+    else if (!e.voiceId) { appendLog(`Warning: '${name}' has no voice selected; its lines will fail.`, "error"); problems++; }
+  }
+  return problems;
 }
 
 async function saveVoiceMapping() {
-  const entries = voiceMap.filter((e) => e.voiceType.trim());
+  for (const e of voiceMap) e.voiceType = e.voiceType.trim();
+  const entries = voiceMap.filter((e) => e.voiceType);
+  const dupes = findDuplicateVoiceTypes(entries);
+  if (dupes.length > 0) {
+    appendLog(`Not saved: these VoiceTypes appear more than once (letter case is ignored): ${dupes.join(", ")}. Remove or rename the extras.`, "error");
+    return false;
+  }
   const result = await call("saveVoiceMap", { entries });
-  appendLog(`Voice mapping saved (${result.count} row(s)).`, "ok");
+  markClean();
+  const problems = reportMappingProblems(entries);
+  appendLog(`Voice mapping saved (${result.count} row(s))${problems ? `, ${problems} need attention (marked in orange)` : ""}.`, problems ? undefined : "ok");
+  return true;
 }
 
 async function exportVoiceMapCsv() {
@@ -241,10 +352,16 @@ async function importVoiceMapCsv() {
   const path = await call("browseOpenFile", { title: "Import Voice Mapping", filterName: "CSV files", filterExtensions: ["csv"] });
   if (!path) return;
 
-  const { entries } = await call("importVoiceMapCsv", { path });
+  const { entries, warnings } = await call("importVoiceMapCsv", { path });
   let imported = 0, updated = 0;
 
   for (const e of entries) {
+    // An older file has no Provider column: if exactly one loaded provider offers that voice id, that's the provider.
+    if (e.needsProvider && !e.providerId) {
+      const owners = Object.keys(voicesByProvider).filter((id) => voicesByProvider[id].some((v) => v.voiceId === e.voiceId));
+      if (owners.length === 1) e.providerId = owners[0];
+    }
+    delete e.needsProvider;
     const existing = voiceMap.find((v) => v.voiceType.toLowerCase() === e.voiceType.toLowerCase());
     if (existing) {
       Object.assign(existing, e);
@@ -257,7 +374,11 @@ async function importVoiceMapCsv() {
 
   renderVoiceMapTable();
   appendLog(`Voice mapping imported from ${path}: ${imported} new, ${updated} updated.`, "ok");
-  if (imported + updated > 0) await saveVoiceMapping();
+  for (const w of warnings || []) appendLog(w, "error");
+  if (imported + updated > 0) {
+    markDirty();
+    await saveVoiceMapping();
+  }
 }
 
 // ==========================================================================
@@ -269,19 +390,16 @@ async function refreshAllVoices() {
   providerKeys = keys;
 
   const { voicesByProvider: results, errors } = await call("refreshAllVoices", { providerKeys: keys });
-  voicesByProvider = results;
-
-  let total = 0;
-  for (const id in voicesByProvider) total += voicesByProvider[id].length;
-  document.getElementById("voice-count-badge").textContent =
-    `${total} voice(s) loaded across ${Object.keys(voicesByProvider).length} provider(s)`;
+  // Only providers that answered are replaced: one that failed (bad key, offline) keeps the list it had.
+  for (const id in results) voicesByProvider[id] = Array.from(results[id]);
+  updateVoiceBadge();
 
   renderVoiceMapTable();
   refreshSingleLineDropdowns();
 
   const errorMessages = Object.entries(errors);
   if (errorMessages.length > 0) {
-    appendLog("Some providers failed to load voices:", "error");
+    appendLog("Some providers failed to load voices (their previous voice lists were kept):", "error");
     for (const [id, msg] of errorMessages) appendLog(`  ${providerById(id)?.displayName || id}: ${msg}`, "error");
   }
 }
@@ -296,12 +414,17 @@ function refreshSingleLineDropdowns() {
   const modelSelect = document.getElementById("single-model");
   const voiceSelect = document.getElementById("single-voice");
 
+  // Rebuilding the lists must not undo what the user already picked.
+  const keepModel = modelSelect.value, keepVoice = voiceSelect.value;
+
   modelSelect.innerHTML = provider ? provider.models.map((m) => `<option value="${m}">${m}</option>`).join("") : "";
+  if (provider && provider.models.includes(keepModel)) modelSelect.value = keepModel;
 
   const voices = voicesByProvider[providerId] || [];
   voiceSelect.innerHTML = voices.length
-    ? voices.map((v) => `<option value="${v.voiceId}" data-display="${escapeAttr(v.displayName)}">${escapeHtml(v.displayName)} [${v.voiceId}]</option>`).join("")
-    : `<option value="">-- click "Get Available Voices" above (local providers: make a voice on the Local Voices page) --</option>`;
+    ? voices.map((v) => `<option value="${escapeAttr(v.voiceId)}" data-display="${escapeAttr(v.displayName)}">${escapeHtml(voiceLabel(v.displayName, v.voiceId))}</option>`).join("")
+    : `<option value="">-- click "Get Available Voices" on the Voice Mapping page (local providers: make a voice on the Local Voices page) --</option>`;
+  if (voices.some((v) => v.voiceId === keepVoice)) voiceSelect.value = keepVoice;
 }
 
 async function generateSingleLine() {
@@ -327,7 +450,7 @@ async function generateSingleLine() {
   const fileName = document.getElementById("single-filename").value.trim() || "line1.wav";
 
   try {
-    appendLog(`Generating via ${provider.displayName}: "${truncate(text, 60)}" -> ${outputPath}\\${fileName}`);
+    appendLog(`Generating via ${provider.displayName}: "${truncate(text, 60)}" ...`);
     const result = await call("generateSingleLine", {
       providerId, modelId, voiceId,
       apiKey: creds.apiKey, groupId: creds.groupId,
@@ -376,6 +499,9 @@ async function startBatch() {
   if (voiceMap.filter((e) => e.voiceType.trim()).length === 0) {
     if (!confirm("The Voice Mapping table is empty, so every line will fail. Continue anyway?")) return;
   }
+
+  // The batch uses the table as shown; make sure that is also what is saved.
+  if (mappingDirty && !(await saveVoiceMapping())) return;
 
   const providerKeysNow = collectProviderKeysFromForm();
 

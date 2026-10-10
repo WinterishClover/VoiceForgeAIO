@@ -48,11 +48,12 @@ internal sealed class BatchProcessor
         CancellationToken ct)
     {
         var failures = new System.Collections.Concurrent.ConcurrentBag<(CsvRow, string)>();
-        int skipped = 0, completed = 0, failedCount = 0;
+        int skipped = 0, completed = 0, failedCount = 0, succeeded = 0;
         int total = rows.Count;
         object progressLock = new();
 
         var pending = new List<(CsvRow Row, string WavPath, string LipPath, string XwmPath, string FuzPath, VoiceMapEntry Map, ITtsProvider Provider)>();
+        var claimedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Resolve mapping + skip-existing up front so "Total" reflects real work.
         foreach (var row in rows)
@@ -86,6 +87,15 @@ internal sealed class BatchProcessor
             string xwmPath = Path.Combine(voiceDir, baseName + ".xwm");
             string fuzPath = Path.Combine(voiceDir, baseName + ".fuz");
 
+            // Two lines with the same EditorID and VoiceType would write the same file; the second would
+            // silently replace the first (or collide while both are written at once).
+            if (!claimedFiles.Add(wavPath))
+            {
+                failures.Add((row, $"Duplicate EditorID '{row.Id}' for VoiceType '{row.VoiceType}': another line in this CSV writes the same file. Give each line its own EditorID."));
+                failedCount++;
+                continue;
+            }
+
             bool wavExists = File.Exists(wavPath);
             bool lipDone = !options.GenerateLip || File.Exists(lipPath);
             bool fuzDone = !options.GenerateFuz || File.Exists(fuzPath);
@@ -98,7 +108,9 @@ internal sealed class BatchProcessor
             pending.Add((row, wavPath, lipPath, xwmPath, fuzPath, mapEntry, provider));
         }
 
-        progress.Report(new BatchProgress(0, total, skipped, failedCount, "",
+        // Lines that were skipped or failed up front count as done, so progress reaches total/total.
+        completed = skipped + failedCount;
+        progress.Report(new BatchProgress(completed, total, skipped, failedCount, "",
             $"Resolved {pending.Count} line(s) to synthesize, {skipped} already exist, {failedCount} unmapped/misconfigured."));
 
         using var throttle = new SemaphoreSlim(Math.Max(1, options.Concurrency));
@@ -148,6 +160,7 @@ internal sealed class BatchProcessor
                 lock (progressLock)
                 {
                     completed++;
+                    succeeded++;
                     progress.Report(new BatchProgress(completed, total, skipped, failedCount, item.Row.Id, "OK" + statusSuffix));
                 }
             }
@@ -200,8 +213,8 @@ internal sealed class BatchProcessor
             }
         }
 
-        int success = total - skipped - failedCount;
-        return (Math.Max(0, success), failedCount, skipped, failures.ToList());
+        // Counted as lines finish, so a stopped batch reports what it really made.
+        return (succeeded, failedCount, skipped, failures.ToList());
     }
 
     private static string SanitizeFileName(string name)

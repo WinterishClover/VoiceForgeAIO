@@ -19,6 +19,23 @@ Install steps: [docs/omnivoice.md](docs/omnivoice.md) and
 [docs/qwen3-tts.md](docs/qwen3-tts.md). The Python bridge scripts they use
 live in `VoiceForgeAIO/tools/` and ship next to the exe.
 
+## Voice Mapping and batch fixes
+
+Found by running the app end to end (see `tests/e2e`):
+
+- **Voice Mapping**
+  - VoiceTypes are trimmed (a trailing space used to make a name never match the CSV).
+  - Names that differ only by letter case can't both be saved; the save says which.
+  - Rows with no voice, an unknown provider, or a voice that no longer exists are marked orange and listed when you save.
+  - Click a row to select it; Ctrl-click and Shift-click select several. Remove Selected explains itself when nothing is selected.
+  - The table shows `* ` on **Save Mapping** while there are unsaved edits, and a batch saves them first.
+  - Voice lists from **Get Available Voices** are remembered between launches, and a provider that fails to refresh keeps the list it had.
+- **Mapping CSV import** understands the older `VoiceType,VoiceId,VoiceDisplay` format (the provider is filled in when only one loaded provider offers that voice, otherwise flagged), is case-insensitive about provider names, and warns about rows it can't place.
+- **CSV Batch**
+  - Quoted text may span several lines; a `EditorID,VoiceType,Text` header row is skipped.
+  - Two lines that would write the same file (same EditorID and VoiceType) are reported instead of overwriting each other.
+  - Progress reaches 100%, Stop reports how many lines were really made, `_failures.csv` is written even if the voice folder doesn't exist yet, and an old one is removed after a clean run.
+
 ## Earlier change: web-based UI (Photino.NET)
 
 The UI is now built with real HTML/CSS/JavaScript, rendered through the OS's
