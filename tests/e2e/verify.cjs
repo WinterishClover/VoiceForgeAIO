@@ -3,8 +3,8 @@ const results = []; const check = (name, ok, detail = '') => { results.push([nam
 const T = (ms) => new Promise(r => setTimeout(r, ms));
 const csvRun = async (p, name, content, conc) => { const csv = path.join(h.OUT, name + '.csv'); fs.writeFileSync(csv, content); await p.click('[data-page="batch-page"]'); await p.fill('#batch-csv-path', csv); await p.fill('#batch-voice-folder', path.join(h.OUT, 'v_' + name)); if (conc) await p.fill('#batch-concurrency', String(conc)); await p.click('#start-batch-btn'); await p.waitForFunction(() => !document.getElementById('start-batch-btn').disabled, null, { timeout: 20000 }); await T(200); return h.logText(p); };
 (async () => {
-  await h.startHost(); const b = await h.chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined }); let p = await h.open(b);
-  await p.click('[data-open-modal="settings-modal-overlay"]'); await p.fill('.provider-key-input[data-provider="Fake"]', 'good'); await p.click('#save-settings-btn'); await p.keyboard.press('Escape');
+  await h.startHost(); const b = await h.chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined }); const outside = []; let p = await h.open(b); p.on('request', r => { if (!/^(http:\/\/localhost|data:)/.test(r.url())) outside.push(r.url()); });
+  await p.click('[data-page="settings-page"]'); await p.fill('.provider-key-input[data-provider="Fake"]', 'good'); await p.click('#save-settings-btn'); await p.click('[data-page="voice-mapping-page"]');
   await p.click('#refresh-voices-btn'); await p.waitForTimeout(800);
   const mapFile = () => JSON.parse(fs.readFileSync(h.HOME + '/.config/VoiceForgeAIO/voice_map.json', 'utf8'));
 
@@ -85,6 +85,13 @@ const csvRun = async (p, name, content, conc) => { const csv = path.join(h.OUT, 
   await p.click('[data-page="single-line-page"]'); await p.selectOption('#single-provider', 'Fake'); await p.selectOption('#single-model', 'fake-2');
   await p.click('[data-page="local-voices-page"]'); await p.click('#qwenNewButton'); await p.fill('#qwenVoiceName', 'Tmp'); await p.fill('#qwenVoiceInstruct', 'x'); await p.click('#qwenVoiceSaveButton'); await T(500);
   await p.click('[data-page="single-line-page"]'); check('Single-Line model survives a voice list change', (await p.inputValue('#single-model')) === 'fake-2');
+  // UI shell: sidebar, log dock, key status, modals, no outside requests
+  await p.click('[data-page="settings-page"]');
+  check('Settings is a page and shows which keys are entered', (await p.textContent('.provider-key-input[data-provider="Fake"] >> xpath=../div/em')) === 'Key entered' && (await p.textContent('.provider-key-input[data-provider="Inworld"] >> xpath=../div/em')) === 'Not set');
+  await p.click('#sidebar-toggle'); check('sidebar collapses', await p.$eval('#app', e => e.classList.contains('sidebar-collapsed'))); await p.click('#sidebar-toggle'); check('...and expands again', !(await p.$eval('#app', e => e.classList.contains('sidebar-collapsed'))));
+  await p.click('#log-toggle'); check('log dock hides', !(await p.isVisible('#log-output'))); await p.click('#log-toggle'); check('...and shows again', await p.isVisible('#log-output'));
+  await p.click('[data-open-modal="help-modal-overlay"]'); check('Help opens', await p.isVisible('#help-modal-overlay .modal')); await p.keyboard.press('Escape'); check('Escape closes it', !(await p.isVisible('#help-modal-overlay .modal')));
+  check('nothing is requested from outside this app (no web fonts)', outside.length === 0, JSON.stringify(outside));
   // V7 restart: remembered cloud voices
   await p.close(); await h.stopHost(); await h.startHost(); p = await h.open(b);
   r = await h.rows(p); const kay = r.find(x => x.type === 'Kaylin');

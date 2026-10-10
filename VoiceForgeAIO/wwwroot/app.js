@@ -102,9 +102,18 @@ function renderProviderKeyRows() {
     row.className = "field-row";
     row.innerHTML = `
       <div class="grow">
-        <label class="field-label">${p.displayName}</label>
-        <input type="password" class="provider-key-input" data-provider="${p.id}" data-field="apiKey" value="${escapeAttr(keys.apiKey)}" />
+        <div class="field-title"><label class="field-label">${p.displayName}</label><em class="key-status"></em></div>
+        <input type="password" class="provider-key-input" data-provider="${p.id}" data-field="apiKey" value="${escapeAttr(keys.apiKey)}" placeholder="Paste your ${escapeAttr(p.displayName)} API key" autocomplete="off" />
       </div>`;
+    const keyInput = row.querySelector("input");
+    const keyStatus = row.querySelector(".key-status");
+    const showKeyStatus = () => {
+      const has = keyInput.value.trim().length > 0;
+      keyStatus.textContent = has ? "Key entered" : "Not set";
+      keyStatus.classList.toggle("configured", has);
+    };
+    keyInput.addEventListener("input", showKeyStatus);
+    showKeyStatus();
     container.appendChild(row);
 
     if (p.id === "MiniMax") {
@@ -112,8 +121,8 @@ function renderProviderKeyRows() {
       groupRow.className = "field-row";
       groupRow.innerHTML = `
         <div class="grow">
-          <label class="field-label">MiniMax Group ID</label>
-          <input type="password" class="provider-key-input" data-provider="MiniMax" data-field="groupId" value="${escapeAttr(keys.groupId)}" />
+          <div class="field-title"><label class="field-label">MiniMax Group ID</label></div>
+          <input type="password" class="provider-key-input" data-provider="MiniMax" data-field="groupId" value="${escapeAttr(keys.groupId)}" placeholder="From your MiniMax dashboard" autocomplete="off" />
         </div>`;
       container.appendChild(groupRow);
     }
@@ -438,7 +447,7 @@ function refreshSingleLineDropdowns() {
   const voices = voicesByProvider[providerId] || [];
   voiceSelect.innerHTML = voices.length
     ? voices.map((v) => `<option value="${escapeAttr(v.voiceId)}" data-display="${escapeAttr(v.displayName)}">${escapeHtml(voiceLabel(v.displayName, v.voiceId))}</option>`).join("")
-    : `<option value="">-- click "Get Available Voices" on the Voice Mapping page (local providers: make a voice on the Local Voices page) --</option>`;
+    : `<option value="">-- load voices on the Voice Mapping page first --</option>`;
   if (voices.some((v) => v.voiceId === keepVoice)) voiceSelect.value = keepVoice;
 }
 
@@ -544,8 +553,16 @@ async function startBatch() {
   }
 }
 
+/** The sidebar footer shows at a glance whether a batch is running. */
+function setStatus(text, busy = false) {
+  document.getElementById("status-text").textContent = text;
+  document.getElementById("status-dot").classList.toggle("busy", busy);
+  document.getElementById("status-dot").classList.toggle("ready", !busy);
+}
+
 function setBatchControlsEnabled(enabled) {
   batchRunning = !enabled;
+  setStatus(enabled ? "Ready" : "Generating...", !enabled);
   document.getElementById("start-batch-btn").disabled = !enabled;
   document.getElementById("pause-batch-btn").disabled = enabled;
   document.getElementById("stop-batch-btn").disabled = enabled;
@@ -686,6 +703,12 @@ function wireStaticHandlers() {
   document.getElementById("pause-batch-btn").addEventListener("click", togglePauseBatch);
   document.getElementById("stop-batch-btn").addEventListener("click", stopBatch);
 
+  document.getElementById("log-toggle").addEventListener("click", () => {
+    const panel = document.getElementById("log-panel");
+    const collapsed = panel.classList.toggle("collapsed");
+    document.getElementById("log-toggle").textContent = collapsed ? "Show" : "Hide";
+    document.getElementById("log-resizer").classList.toggle("disabled", collapsed);
+  });
   document.getElementById("save-log-btn").addEventListener("click", saveLogToFile);
   document.getElementById("clear-log-btn").addEventListener("click", clearLog);
 
@@ -717,6 +740,7 @@ function wireStaticHandlers() {
     document.getElementById("batch-progress-fill").style.width = `${pct}%`;
     document.getElementById("batch-progress-label").textContent =
       `Progress: ${p.completed}/${p.total}   Skipped: ${p.skipped}   Failed: ${p.failed}`;
+    setStatus(`Generating ${p.completed}/${p.total}`, true);
     if (p.currentId) appendLog(`[${p.completed}/${p.total}] ${p.currentId} -- ${p.message}`, p.message?.startsWith("FAILED") ? "error" : undefined);
     else if (p.message) appendLog(p.message);
   });
@@ -774,7 +798,7 @@ function wireSplash() {
 // ==========================================================================
 
 function wireSidebarNav() {
-  document.querySelectorAll(".nav-item").forEach((btn) => {
+  document.querySelectorAll(".nav-item[data-page]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const pageId = btn.dataset.page;
 
@@ -783,13 +807,15 @@ function wireSidebarNav() {
 
       document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
       document.getElementById(pageId).classList.add("active");
+      document.getElementById("content-area").scrollTo(0, 0);
     });
   });
 
   document.getElementById("sidebar-toggle").addEventListener("click", () => {
-    const sidebar = document.getElementById("sidebar");
-    const collapsed = sidebar.classList.toggle("collapsed");
-    document.getElementById("sidebar-toggle").title = collapsed ? "Expand" : "Collapse";
+    const collapsed = document.getElementById("app").classList.toggle("sidebar-collapsed");
+    const toggle = document.getElementById("sidebar-toggle");
+    toggle.title = collapsed ? "Expand sidebar" : "Collapse sidebar";
+    toggle.innerHTML = collapsed ? "&#8250;" : "&#8249;";
   });
 }
 
@@ -825,23 +851,22 @@ function closeModal(id) { document.getElementById(id).classList.remove("open"); 
 function wireLogResizer() {
   const resizer = document.getElementById("log-resizer");
   const logPanel = document.getElementById("log-panel");
-  const workspace = document.querySelector(".workspace");
+  const main = document.querySelector(".main");
   let dragging = false;
 
   resizer.addEventListener("mousedown", (e) => {
     dragging = true;
     resizer.classList.add("dragging");
     document.body.style.userSelect = "none";
+    document.body.style.cursor = "row-resize";
     e.preventDefault();
   });
 
   window.addEventListener("mousemove", (e) => {
     if (!dragging) return;
-    const workspaceRect = workspace.getBoundingClientRect();
-    let newLogWidth = workspaceRect.right - e.clientX;
-    const min = 280, max = workspaceRect.width - 340; // keep both sides usable
-    newLogWidth = Math.max(min, Math.min(max, newLogWidth));
-    logPanel.style.width = `${newLogWidth}px`;
+    const rect = main.getBoundingClientRect();
+    const min = 90, max = rect.height - 240; // keep the page above usable
+    logPanel.style.height = `${Math.max(min, Math.min(max, rect.bottom - e.clientY))}px`;
   });
 
   window.addEventListener("mouseup", () => {
@@ -849,6 +874,7 @@ function wireLogResizer() {
     dragging = false;
     resizer.classList.remove("dragging");
     document.body.style.userSelect = "";
+    document.body.style.cursor = "";
   });
 }
 

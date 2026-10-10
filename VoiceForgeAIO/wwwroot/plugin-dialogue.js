@@ -108,6 +108,7 @@ async function readSelected(pathOverride) {
     $("plugin-lines-search").value = "";
     renderResult();
     host.onPluginLoaded();
+    $("plugin-result").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (err) {
     host.appendLog(`Could not read the plugin: ${err.message}`, "error");
   } finally {

@@ -14,10 +14,18 @@ per-line cost, nothing leaves your computer**:
 Set them up on the new **Local Voices** page (point it at the Python of each
 tool's own environment, optionally run inside WSL, then *Check the install*),
 make voices and audition them with *Hear sample*, then pick the provider in
-**Voice Mapping**, **Single-Line Generate** or a CSV batch like any other.
+**Voice Mapping**, **Single Line** or **Generate** like any other.
 Install steps: [docs/omnivoice.md](docs/omnivoice.md) and
 [docs/qwen3-tts.md](docs/qwen3-tts.md). The Python bridge scripts they use
 live in `VoiceForgeAIO/tools/` and ship next to the exe.
+
+## Look and feel
+
+The interface now matches StoryLoom: the same dark navy panels and amber accent, serif page titles with
+small spaced section labels, a collapsible branded sidebar (Plugin Dialogue, Voice Mapping, Single Line,
+Generate, Local Voices; Settings, Help and About at the bottom), rounded cards, and a resizable log dock
+along the bottom that can be hidden. Settings is a page instead of a pop-up, each API key shows whether
+one is entered, and the sidebar shows when a batch is generating. No web fonts or other outside resources are loaded.
 
 ## Read dialogue straight from a plugin (no xEdit, no CSV)
 
@@ -34,7 +42,7 @@ the way StoryLoom does, so the xEdit exporter scripts and CSV step are optional 
 3. **Voice types**: every line is grouped by VoiceType with its line count, speakers and current
    Voice Mapping. Untick any you don't want voiced. **Add missing VoiceTypes to Voice Mapping**
    creates the rows; pick a provider and voice for each.
-4. **Generate audio for ticked VoiceTypes** switches CSV Batch Generate to the plugin as its source
+4. **Generate audio for ticked VoiceTypes** switches **Generate** to the plugin as its source
    (everything there -- LIP, FUZ, overwrite, pause/stop, `_failures.csv` -- works the same). The output
    folder is suggested as `Data\Sound\Voice\<Plugin>`; change it if you'd rather not write into
    Data directly.
@@ -198,8 +206,8 @@ turnaround.
    the **Voice** for it (the dropdown repopulates based on whichever
    provider you picked for that row). Repeat per character, then
    **Save Mapping**.
-3. **CSV Batch Generate**: pick your CSV, pick the mod's `.esp` Voice folder,
-   optionally check **Generate .lip files**, and hit **CSV Batch Generate**.
+3. **Generate**: pick your CSV, pick the mod's `.esp` Voice folder,
+   optionally check **Generate .lip files**, and hit **Generate audio**.
 
 ## CSV format (unchanged)
 
@@ -212,7 +220,7 @@ to find both the Provider and the Voice to use for that line.
 
 ## LIP generation
 
-Off by default -- check **"Generate .lip files"** in CSV Batch Generate to
+Off by default -- check **"Generate .lip files"** on the Generate page to
 turn it on. When enabled, after each WAV is written, VoiceForge AIO shells
 out to **FaceFXWrapper.exe** (https://github.com/Nukem9/FaceFXWrapper, MIT
 licensed) to produce a matching `.lip` file in the same VoiceType folder.

@@ -2,308 +2,275 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VoiceForge AIO</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <!-- ===================== Splash (first launch only) ===================== -->
+  <!-- ===================== Welcome (first launch only) ===================== -->
   <div id="splash-overlay">
     <div class="splash-card">
-      <div class="splash-mark">VOICEFORGE <span class="accent">AIO</span></div>
-      <div class="splash-tagline">Multi-provider TTS + LIP/FUZ pipeline for Skyrim modding</div>
-      <div class="splash-body">
-        Generate voiced dialogue across eight TTS providers (two of them free and local), build matching
-        <strong>.lip</strong> files, and package everything into Bethesda's
-        <strong>.fuz</strong> format &mdash; all from one place.
-      </div>
-      <button id="splash-continue-btn">Get Started</button>
+      <div class="splash-mark" aria-hidden="true">VF</div>
+      <span class="eyebrow">SKYRIM VOICE PIPELINE</span>
+      <h1>VoiceForge <span class="accent">AIO</span></h1>
+      <p class="splash-body">
+        Voice your mod's dialogue with eight TTS providers (two of them free and local), build the matching
+        <strong>.lip</strong> files, and package everything into Bethesda's <strong>.fuz</strong> format &mdash;
+        straight from your plugin, no spreadsheet needed.
+      </p>
+      <button id="splash-continue-btn" class="primary-button" type="button">Get started</button>
     </div>
   </div>
 
-  <div id="app">
-    <!-- ===================== Top menu bar ===================== -->
-    <header class="topbar">
-      <div class="topbar-brand">
-        <span class="brand-icon">&#9835;</span>
-        <span class="brand-word">VOICEFORGE<span class="accent"> AIO</span></span>
+  <div class="app-shell" id="app">
+
+    <!-- ===================== Sidebar ===================== -->
+    <aside class="sidebar" id="sidebar">
+      <button class="sidebar-toggle" id="sidebar-toggle" type="button" title="Collapse sidebar" aria-label="Collapse sidebar">&#8249;</button>
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">VF</div>
+        <div class="brand-text">
+          <h1>VoiceForge</h1>
+          <p>AIO &middot; Voice Studio</p>
+        </div>
       </div>
-      <nav class="topbar-menu">
-        <button class="topbar-btn" data-open-modal="settings-modal-overlay">Settings</button>
-        <button class="topbar-btn" data-open-modal="help-modal-overlay">Help</button>
-        <button class="topbar-btn" data-open-modal="about-modal-overlay">About</button>
+
+      <nav class="nav" aria-label="Primary navigation">
+        <div class="nav-main">
+          <button class="nav-item" type="button" data-page="plugin-dialogue-page">
+            <span class="nav-icon">&#10077;</span><span class="nav-label">Plugin Dialogue</span>
+          </button>
+          <button class="nav-item active" type="button" data-page="voice-mapping-page">
+            <span class="nav-icon">&#8644;</span><span class="nav-label">Voice Mapping</span>
+          </button>
+          <button class="nav-item" type="button" data-page="single-line-page">
+            <span class="nav-icon">&#9834;</span><span class="nav-label">Single Line</span>
+          </button>
+          <button class="nav-item" type="button" data-page="batch-page">
+            <span class="nav-icon">&#9636;</span><span class="nav-label">Generate</span>
+          </button>
+          <button class="nav-item" type="button" data-page="local-voices-page">
+            <span class="nav-icon">&#9672;</span><span class="nav-label">Local Voices</span>
+          </button>
+        </div>
+        <div class="nav-bottom">
+          <button class="nav-item" type="button" data-page="settings-page">
+            <span class="nav-icon">&#9881;</span><span class="nav-label">Settings</span>
+          </button>
+          <button class="nav-item" type="button" data-open-modal="help-modal-overlay"><span class="nav-icon">?</span><span class="nav-label">Help</span></button>
+          <button class="nav-item" type="button" data-open-modal="about-modal-overlay"><span class="nav-icon">&#9432;</span><span class="nav-label">About</span></button>
+        </div>
       </nav>
-    </header>
 
-    <div class="workspace">
-      <!-- ===================== Sidebar nav ===================== -->
-      <aside class="sidebar" id="sidebar">
-        <button class="sidebar-toggle" id="sidebar-toggle" title="Collapse">&#8249;</button>
-        <nav class="sidebar-nav">
-          <button class="nav-item" data-page="plugin-dialogue-page" title="Plugin Dialogue">
-            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2h9l4 4v16H6z"/><path d="M14 2v5h5M9 12h7M9 16h7"/></svg>
-            <span class="nav-label">Plugin Dialogue</span>
-          </button>
-          <button class="nav-item active" data-page="voice-mapping-page" title="Voice Mapping">
-            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h6M3 12l3-3M3 12l3 3M21 12h-6M21 12l-3-3M21 12l-3 3"/><circle cx="12" cy="12" r="2.4"/></svg>
-            <span class="nav-label">Voice Mapping</span>
-          </button>
-          <button class="nav-item" data-page="single-line-page" title="Single-Line Generate">
-            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/></svg>
-            <span class="nav-label">Single-Line Generate</span>
-          </button>
-          <button class="nav-item" data-page="batch-page" title="CSV Batch Generate">
-            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16M13 13h5M13 17h5"/></svg>
-            <span class="nav-label">CSV Batch Generate</span>
-          </button>
-          <button class="nav-item" data-page="local-voices-page" title="Local Voices">
-            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4M7 10h2l1.5-2.5 2 5 1.5-2.5H17"/></svg>
-            <span class="nav-label">Local Voices</span>
-          </button>
-        </nav>
-      </aside>
+      <div class="sidebar-footer">
+        <div class="connection"><span class="connection-dot ready" id="status-dot"></span><span id="status-text">Ready</span></div>
+        <span class="privacy">API keys are encrypted on this PC</span>
+      </div>
+    </aside>
 
-      <!-- ===================== Main content pages ===================== -->
+    <!-- ===================== Main ===================== -->
+    <div class="main">
       <main class="content-area" id="content-area">
 
-        <!-- ---- Plugin Dialogue page: read a mod's dialogue straight from its plugin (no xEdit, no CSV) ---- -->
+        <!-- ---- Plugin Dialogue ---- -->
         <section class="page" id="plugin-dialogue-page">
-          <div class="page-header">
-            <h2>Plugin Dialogue</h2>
-            <span class="page-subtitle">Read a mod's voiced lines straight from its plugin &mdash; no xEdit script, no CSV</span>
-          </div>
+          <header class="topbar">
+            <div><span class="eyebrow">FROM YOUR MOD</span><h2>Plugin Dialogue</h2></div>
+          </header>
+          <p class="page-intro">Read a mod's voiced lines straight from its plugin &mdash; no xEdit script and no CSV. Pick the plugin, choose which voice types to voice, map them, and generate.</p>
 
-          <div class="card-body-plain" style="max-width: 980px;">
-            <h4 class="local-heading" style="margin-top:0;">1. Where are your plugins?</h4>
-            <div class="field-row">
-              <div class="grow">
-                <label class="field-label" for="plugin-data-path">Skyrim Data folder</label>
-                <input type="text" id="plugin-data-path" placeholder="C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data" />
-              </div>
-              <div class="fixed"><button class="secondary" data-browse-folder="plugin-data-path">Browse&hellip;</button></div>
-              <div class="fixed"><button class="secondary" id="plugin-detect-btn">Auto-detect</button></div>
+          <section class="settings-card">
+            <div class="settings-heading"><span class="section-label">STEP 1</span><h3>Where are your plugins?</h3></div>
+            <div class="form-stack">
+              <label class="field"><span>Skyrim Data folder</span>
+                <div class="path-control">
+                  <input type="text" id="plugin-data-path" placeholder="C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data" />
+                  <button class="secondary" type="button" data-browse-folder="plugin-data-path">Browse&hellip;</button>
+                  <button class="secondary" type="button" id="plugin-detect-btn">Auto-detect</button>
+                </div>
+              </label>
+              <label class="field"><span>Extra plugin folder <em class="optional">optional &mdash; e.g. Mod Organizer 2's <code>mods</code> folder</em></span>
+                <div class="path-control">
+                  <input type="text" id="plugin-extra-path" />
+                  <button class="secondary" type="button" data-browse-folder="plugin-extra-path">Browse&hellip;</button>
+                </div>
+              </label>
             </div>
-            <div class="field-row">
-              <div class="grow">
-                <label class="field-label" for="plugin-extra-path">Extra plugin folder (optional &mdash; e.g. Mod Organizer 2's <code>mods</code> folder)</label>
-                <input type="text" id="plugin-extra-path" />
-              </div>
-              <div class="fixed"><button class="secondary" data-browse-folder="plugin-extra-path">Browse&hellip;</button></div>
+            <div class="button-bar">
+              <button id="plugin-scan-btn" type="button">Find plugins</button>
+              <button class="secondary" id="plugin-open-btn" type="button">Open a plugin file&hellip;</button>
+              <label class="checkbox-row inline"><input type="checkbox" id="plugin-show-official" /><span>Also list Skyrim's own files and Creation Club content</span></label>
             </div>
-            <div class="button-bar" style="margin-top:0;">
-              <button id="plugin-scan-btn">Find plugins</button>
-              <button class="secondary" id="plugin-open-btn">Open a plugin file&hellip;</button>
-            </div>
-            <div class="checkbox-row"><input type="checkbox" id="plugin-show-official" /><label for="plugin-show-official">Also list Skyrim's own files and Creation Club content</label></div>
+          </section>
 
-            <h4 class="local-heading">2. Choose a plugin</h4>
-            <div class="field-row">
-              <div class="grow"><input type="text" id="plugin-filter" placeholder="Filter plugins by name or folder&hellip;" /></div>
-              <div class="fixed"><button id="plugin-read-btn" disabled>Read dialogue</button></div>
+          <section class="settings-card">
+            <div class="settings-heading"><span class="section-label">STEP 2</span><h3>Choose a plugin</h3></div>
+            <div class="path-control">
+              <input type="text" id="plugin-filter" placeholder="Filter plugins by name or folder&hellip;" />
+              <button id="plugin-read-btn" type="button" disabled>Read dialogue</button>
             </div>
-            <select id="plugin-list" size="9" style="height:auto;"></select>
+            <select id="plugin-list" size="8"></select>
             <div class="field-hint" id="plugin-list-hint">Set the Data folder above and click Find plugins.</div>
+          </section>
 
-            <div id="plugin-result" class="hidden">
-              <h4 class="local-heading">3. Voice types in <span id="plugin-result-name"></span></h4>
-              <div id="plugin-summary" class="field-hint" style="margin-top:0;"></div>
-              <div id="plugin-warnings" class="plugin-warnings"></div>
-              <div class="grid-scroll grid-scroll-tall">
-                <table class="grid">
-                  <thead><tr>
-                    <th style="width:44px;"><input type="checkbox" id="plugin-vt-all" title="Select all / none" checked /></th>
-                    <th style="width:26%;">VoiceType</th><th style="width:70px;">Lines</th><th>Speakers</th><th style="width:28%;">Voice Mapping</th>
-                  </tr></thead>
-                  <tbody id="plugin-vt-body"></tbody>
-                </table>
-              </div>
-              <div class="button-bar">
-                <button id="plugin-add-mapping-btn">Add missing VoiceTypes to Voice Mapping</button>
-                <button id="plugin-generate-btn">Generate audio for ticked VoiceTypes &rarr;</button>
-                <button class="secondary" id="plugin-export-btn">Export as CSV&hellip;</button>
-              </div>
-
-              <h4 class="local-heading">Lines <span id="plugin-lines-count" class="local-state"></span></h4>
-              <div class="field-row">
-                <div class="grow"><input type="text" id="plugin-lines-search" placeholder="Search the text, file name or speaker&hellip;" /></div>
-                <div class="fixed"><button class="secondary" id="plugin-lines-clear-btn">Show all VoiceTypes</button></div>
-              </div>
-              <div class="grid-scroll grid-scroll-tall">
-                <table class="grid">
-                  <thead><tr><th style="width:24%;">File name</th><th style="width:16%;">VoiceType</th><th>Text</th></tr></thead>
-                  <tbody id="plugin-lines-body"></tbody>
-                </table>
-              </div>
-              <div class="button-bar"><button class="secondary" id="plugin-lines-more-btn">Show more</button></div>
+          <section class="settings-card hidden" id="plugin-result">
+            <div class="settings-heading"><span class="section-label">STEP 3</span><h3>Voice types in <span id="plugin-result-name"></span></h3></div>
+            <div id="plugin-summary" class="summary-line"></div>
+            <div id="plugin-warnings" class="plugin-warnings"></div>
+            <div class="table-wrap">
+              <table class="grid">
+                <thead><tr>
+                  <th style="width:44px;"><input type="checkbox" id="plugin-vt-all" title="Select all / none" checked /></th>
+                  <th style="width:26%;">VoiceType</th><th style="width:76px;" class="num">Lines</th><th>Speakers</th><th style="width:28%;">Voice Mapping</th>
+                </tr></thead>
+                <tbody id="plugin-vt-body"></tbody>
+              </table>
             </div>
-          </div>
+            <div class="button-bar">
+              <button id="plugin-generate-btn" type="button">Generate audio for ticked VoiceTypes &rarr;</button>
+              <button class="secondary" id="plugin-add-mapping-btn" type="button">Add missing VoiceTypes to Voice Mapping</button>
+              <button class="secondary" id="plugin-export-btn" type="button">Export as CSV&hellip;</button>
+            </div>
+
+            <div class="settings-heading sub"><span class="section-label">LINES</span><h3>Dialogue <span id="plugin-lines-count" class="count-note"></span></h3></div>
+            <div class="path-control">
+              <input type="text" id="plugin-lines-search" placeholder="Search the text, file name or speaker&hellip;" />
+              <button class="secondary" id="plugin-lines-clear-btn" type="button">Show all VoiceTypes</button>
+            </div>
+            <div class="table-wrap">
+              <table class="grid">
+                <thead><tr><th style="width:30%;">File name</th><th style="width:16%;">VoiceType</th><th>Text</th></tr></thead>
+                <tbody id="plugin-lines-body"></tbody>
+              </table>
+            </div>
+            <div class="button-bar"><button class="secondary" id="plugin-lines-more-btn" type="button">Show more</button></div>
+          </section>
         </section>
 
-        <!-- ---- Voice Mapping page ---- -->
+        <!-- ---- Voice Mapping ---- -->
         <section class="page active" id="voice-mapping-page">
-          <div class="page-header">
-            <h2>Voice Mapping</h2>
-            <span class="page-subtitle">VoiceType &rarr; Provider + Voice</span>
-            <span class="badge" id="voice-count-badge">No voices loaded yet</span>
-          </div>
+          <header class="topbar">
+            <div><span class="eyebrow">WHO SPEAKS WITH WHICH VOICE</span><h2>Voice Mapping</h2></div>
+            <div class="hero-actions"><button class="secondary" id="refresh-voices-btn" type="button">Get available voices</button></div>
+          </header>
+          <p class="page-intro">Map each Skyrim VoiceType (the audio folder name) to a provider and voice, once. Click a row to select it; Ctrl-click or Shift-click for several. Rows marked in amber still need attention.</p>
 
-          <div class="button-bar" style="margin-bottom:14px;">
-            <button id="refresh-voices-btn">Get Available Voices</button>
-          </div>
-
-          <div class="grid-scroll grid-scroll-tall">
-            <table class="grid" id="voice-map-table">
-              <thead>
-                <tr>
+          <section class="settings-card">
+            <div class="settings-heading row">
+              <div><span class="section-label">VOICETYPE &rarr; PROVIDER + VOICE</span><h3>Mapping table</h3></div>
+              <span class="status-pill" id="voice-count-badge">No voices loaded yet</span>
+            </div>
+            <div class="table-wrap tall">
+              <table class="grid" id="voice-map-table">
+                <thead><tr>
                   <th style="width:32%;">VoiceType (Skyrim folder name)</th>
                   <th style="width:24%;">Provider</th>
                   <th>Voice</th>
-                </tr>
-              </thead>
-              <tbody id="voice-map-body"></tbody>
-            </table>
-          </div>
-
-          <div class="button-bar">
-            <button class="secondary" id="add-row-btn">Add Row</button>
-            <button class="secondary" id="remove-row-btn">Remove Selected</button>
-            <button id="save-mapping-btn">Save Mapping</button>
-            <button class="secondary" id="export-csv-btn">Export CSV</button>
-            <button class="secondary" id="import-csv-btn">Import CSV</button>
-          </div>
-        </section>
-
-        <!-- ---- Single-Line Generate page ---- -->
-        <section class="page" id="single-line-page">
-          <div class="page-header">
-            <h2>Single-Line Generate</h2>
-            <span class="page-subtitle">Quick one-off test lines</span>
-          </div>
-
-          <div class="card-body-plain" style="max-width: 720px;">
-            <label class="field-label" for="single-text">Enter Text</label>
-            <textarea id="single-text" rows="4"></textarea>
-
-            <div class="field-row" style="margin-top:12px;">
-              <div class="grow">
-                <label class="field-label" for="single-provider">Provider</label>
-                <select id="single-provider"></select>
-              </div>
-              <div class="grow">
-                <label class="field-label" for="single-model">Model</label>
-                <select id="single-model"></select>
-              </div>
+                </tr></thead>
+                <tbody id="voice-map-body"></tbody>
+              </table>
             </div>
-
-            <label class="field-label" for="single-voice">Voice</label>
-            <select id="single-voice" style="margin-bottom:12px;"></select>
-
-            <div class="field-row">
-              <div class="grow">
-                <label class="field-label" for="single-output-path">Output Path</label>
-                <input type="text" id="single-output-path" />
-              </div>
-              <div class="fixed"><button class="secondary" data-browse-folder="single-output-path">Browse&hellip;</button></div>
-            </div>
-
-            <div class="field-row">
-              <div class="grow">
-                <label class="field-label" for="single-filename">Filename</label>
-                <input type="text" id="single-filename" placeholder="line1.wav" />
-              </div>
-              <div class="fixed"><button id="generate-single-btn">Generate Audio</button></div>
-            </div>
-          </div>
-        </section>
-
-        <!-- ---- CSV Batch Generate page ---- -->
-        <section class="page" id="batch-page">
-          <div class="page-header">
-            <h2>CSV Batch Generate</h2>
-            <span class="page-subtitle">Bulk voice line generation with LIP/FUZ pipeline</span>
-          </div>
-
-          <div class="card-body-plain" style="max-width: 760px;">
-            <label class="field-label" for="batch-source">Dialogue to voice</label>
-            <select id="batch-source" style="margin-bottom:12px;">
-              <option value="csv">A CSV file</option>
-              <option value="plugin" id="batch-source-plugin-option" disabled>A plugin read on the Plugin Dialogue page</option>
-            </select>
-            <div id="batch-plugin-info" class="field-hint hidden" style="margin-top:-4px;"></div>
-
-            <div class="field-row" id="batch-csv-row">
-              <div class="grow">
-                <label class="field-label" for="batch-csv-path">CSV File</label>
-                <input type="text" id="batch-csv-path" />
-              </div>
-              <div class="fixed"><button class="secondary" data-browse-file="batch-csv-path" data-filter-name="CSV files" data-filter-ext="csv">Browse&hellip;</button></div>
-            </div>
-
-            <div class="field-row">
-              <div class="grow">
-                <label class="field-label" for="batch-voice-folder">Mod Voice Folder</label>
-                <input type="text" id="batch-voice-folder" />
-              </div>
-              <div class="fixed"><button class="secondary" data-browse-folder="batch-voice-folder">Browse&hellip;</button></div>
-            </div>
-            <div class="field-hint">e.g. .../Data/Sound/Voice/YourMod.esp &mdash; VoiceType subfolders are created under this automatically.</div>
-
-            <div class="field-row" style="margin-top:12px; max-width: 220px;">
-              <div class="grow">
-                <label class="field-label" for="batch-concurrency">Concurrency</label>
-                <input type="number" id="batch-concurrency" min="1" max="10" value="3" />
-              </div>
-            </div>
-
-            <div class="checkbox-row">
-              <input type="checkbox" id="batch-overwrite" />
-              <label for="batch-overwrite">Overwrite existing files</label>
-            </div>
-            <div class="checkbox-row">
-              <input type="checkbox" id="batch-lip" />
-              <label for="batch-lip">Generate .lip files (requires FaceFXWrapper + FonixData.cdf in Settings)</label>
-            </div>
-            <div class="checkbox-row disabled" id="batch-fuz-row">
-              <input type="checkbox" id="batch-fuz" disabled />
-              <label for="batch-fuz">Generate .fuz files (requires .lip above + xWMAEncode/LipFuzer in Settings)</label>
-            </div>
-
             <div class="button-bar">
-              <button id="start-batch-btn">CSV Batch Generate</button>
-              <button class="secondary" id="pause-batch-btn" disabled>Pause</button>
-              <button class="danger" id="stop-batch-btn" disabled>Stop Batch</button>
+              <button id="save-mapping-btn" type="button">Save Mapping</button>
+              <button class="secondary" id="add-row-btn" type="button">Add Row</button>
+              <button class="secondary" id="remove-row-btn" type="button">Remove Selected</button>
+              <span class="spacer"></span>
+              <button class="secondary" id="export-csv-btn" type="button">Export CSV</button>
+              <button class="secondary" id="import-csv-btn" type="button">Import CSV</button>
             </div>
-
-            <div style="margin-top: 14px;">
-              <div class="progress-bar-track"><div class="progress-bar-fill" id="batch-progress-fill"></div></div>
-              <div class="progress-label" id="batch-progress-label">Progress: 0/0</div>
-            </div>
-
-            <div class="field-hint" style="margin-top:12px;" id="batch-csv-format-hint">CSV format (no header): EditorID,VoiceType,"Line text"</div>
-          </div>
+          </section>
         </section>
 
-        <!-- ---- Local Voices page (OmniVoice + Qwen3-TTS) ---- -->
-        <section class="page" id="local-voices-page">
-          <div class="page-header">
-            <h2>Local Voices</h2>
-            <span class="page-subtitle">Free text-to-speech on your own graphics card</span>
-          </div>
-
-          <div class="card-body-plain" style="max-width: 820px;">
-            <div class="field-hint" style="margin-top:0;">
-              OmniVoice and Qwen3-TTS run on this computer: no API key, no per-line cost, nothing leaves your machine.
-              Set up each one once, make voices here, then pick the provider <strong>OmniVoice (local)</strong> or
-              <strong>Qwen3-TTS (local)</strong> in the Voice Mapping page and press <strong>Get Available Voices</strong>.
-              The model stays loaded while lines are being made and is unloaded after a quiet spell so the card is free again.
-              See <code>docs/omnivoice.md</code> and <code>docs/qwen3-tts.md</code> for the install steps.
+        <!-- ---- Single Line ---- -->
+        <section class="page" id="single-line-page">
+          <header class="topbar">
+            <div><span class="eyebrow">QUICK TEST</span><h2>Single Line</h2></div>
+          </header>
+          <p class="page-intro">Try a voice on one line before committing to a batch.</p>
+          <section class="settings-card narrow">
+            <div class="settings-heading"><span class="section-label">LINE</span><h3>Text to speak</h3></div>
+            <div class="form-stack">
+              <label class="field"><span>Text</span><textarea id="single-text" rows="4"></textarea></label>
+              <div class="field-pair">
+                <label class="field"><span>Provider</span><select id="single-provider"></select></label>
+                <label class="field"><span>Model</span><select id="single-model"></select></label>
+              </div>
+              <label class="field"><span>Voice</span><select id="single-voice"></select></label>
+              <label class="field"><span>Output folder</span>
+                <div class="path-control"><input type="text" id="single-output-path" /><button class="secondary" type="button" data-browse-folder="single-output-path">Browse&hellip;</button></div>
+              </label>
+              <label class="field"><span>File name</span>
+                <div class="path-control"><input type="text" id="single-filename" placeholder="line1.wav" /><button id="generate-single-btn" type="button">Generate audio</button></div>
+              </label>
             </div>
+          </section>
+        </section>
 
-            <!-- ---------- OmniVoice ---------- -->
-            <details class="local-card" id="omniSection">
+        <!-- ---- Generate (CSV or plugin) ---- -->
+        <section class="page" id="batch-page">
+          <header class="topbar">
+            <div><span class="eyebrow">VOICE, LIP AND FUZ</span><h2>Generate</h2></div>
+            <div class="hero-actions">
+              <button class="secondary" id="pause-batch-btn" type="button" disabled>Pause</button>
+              <button class="danger" id="stop-batch-btn" type="button" disabled>Stop</button>
+              <button id="start-batch-btn" type="button">Generate audio</button>
+            </div>
+          </header>
+          <p class="page-intro">Voice every line of a plugin (or a CSV) in one run. Finished files are skipped on a re-run, so it is always safe to stop and continue.</p>
+
+          <section class="settings-card">
+            <div class="settings-heading"><span class="section-label">SOURCE</span><h3>Where the lines come from</h3></div>
+            <div class="form-stack">
+              <label class="field"><span>Source</span>
+                <select id="batch-source">
+                  <option value="csv">A CSV file</option>
+                  <option value="plugin" id="batch-source-plugin-option" disabled>A plugin read on the Plugin Dialogue page</option>
+                </select>
+              </label>
+              <div id="batch-plugin-info" class="field-hint hidden"></div>
+              <label class="field" id="batch-csv-row"><span>CSV file</span>
+                <div class="path-control"><input type="text" id="batch-csv-path" /><button class="secondary" type="button" data-browse-file="batch-csv-path" data-filter-name="CSV files" data-filter-ext="csv">Browse&hellip;</button></div>
+              </label>
+              <div class="field-hint" id="batch-csv-format-hint">CSV format (no header): EditorID,VoiceType,"Line text"</div>
+              <label class="field"><span>Mod voice folder</span>
+                <div class="path-control"><input type="text" id="batch-voice-folder" /><button class="secondary" type="button" data-browse-folder="batch-voice-folder">Browse&hellip;</button></div>
+              </label>
+              <div class="field-hint">e.g. .../Data/Sound/Voice/YourMod.esp &mdash; a subfolder per VoiceType is created here.</div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-heading"><span class="section-label">OPTIONS</span><h3>What to make</h3></div>
+            <div class="options-grid">
+              <label class="field narrow-field"><span>Concurrency</span><input type="number" id="batch-concurrency" min="1" max="10" value="3" /></label>
+              <div class="checks">
+                <label class="checkbox-row"><input type="checkbox" id="batch-overwrite" /><span>Overwrite existing files</span></label>
+                <label class="checkbox-row"><input type="checkbox" id="batch-lip" /><span>Generate .lip files <em class="optional">needs FaceFXWrapper and FonixData.cdf in Settings</em></span></label>
+                <label class="checkbox-row disabled" id="batch-fuz-row"><input type="checkbox" id="batch-fuz" disabled /><span>Generate .fuz files <em class="optional">needs .lip above, plus xWMAEncode and LipFuzer in Settings</em></span></label>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-heading"><span class="section-label">PROGRESS</span><h3>Run status</h3></div>
+            <div class="progress-bar-track"><div class="progress-bar-fill" id="batch-progress-fill"></div></div>
+            <div class="progress-label" id="batch-progress-label">Progress: 0/0</div>
+          </section>
+        </section>
+
+        <section class="page" id="local-voices-page">
+          <header class="topbar">
+            <div><span class="eyebrow">FREE &middot; ON YOUR OWN GRAPHICS CARD</span><h2>Local Voices</h2></div>
+          </header>
+          <p class="page-intro">
+            OmniVoice and Qwen3-TTS run on this computer: no API key, no per-line cost, nothing leaves your machine.
+            Set each one up once, make voices here, then pick <strong>OmniVoice (local)</strong> or <strong>Qwen3-TTS (local)</strong>
+            as the provider in Voice Mapping. The model stays loaded while lines are being made and is unloaded after a quiet spell so the card is free again.
+            Install steps: <code>docs/omnivoice.md</code> and <code>docs/qwen3-tts.md</code>.
+          </p>
+          <div class="local-stack">
+<details class="local-card" id="omniSection">
               <summary>OmniVoice <span id="omniState" class="local-state"></span></summary>
               <div class="local-card-body">
                 <div class="field-hint">Describe a voice from OmniVoice's own list of traits, clone it from a short recording, or let the model choose. Delivery tags such as [laughter] and [sigh] in a line are spoken; other tags are removed.</div>
@@ -431,80 +398,65 @@
                 <div id="qwenVoiceMessage" class="local-message" role="status"></div>
               </div>
             </details>
+          
           </div>
+        </section>
+
+        <!-- ---- Settings ---- -->
+        <section class="page" id="settings-page">
+          <header class="topbar">
+            <div><span class="eyebrow">KEYS AND TOOLS</span><h2>Settings</h2></div>
+            <div class="hero-actions"><button id="save-settings-btn" type="button">Save settings</button></div>
+          </header>
+          <p class="page-intro">Provider keys are encrypted with your Windows account and never leave this computer except in requests to that provider.</p>
+
+          <section class="settings-card">
+            <div class="settings-heading"><span class="section-label">PROVIDERS</span><h3>API keys</h3></div>
+            <div id="provider-key-rows" class="key-grid"></div>
+            <label class="checkbox-row"><input type="checkbox" id="show-keys-toggle" /><span>Show keys</span></label>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-heading"><span class="section-label">LIP GENERATION</span><h3>FaceFXWrapper</h3></div>
+            <div class="form-stack">
+              <label class="field"><span>FaceFXWrapper.exe</span>
+                <div class="path-control"><input type="text" id="facefx-path" placeholder="Path to FaceFXWrapper.exe" /><button class="secondary" type="button" data-browse-file="facefx-path" data-filter-name="FaceFXWrapper.exe" data-filter-ext="exe">Browse&hellip;</button></div>
+              </label>
+              <label class="field"><span>FonixData.cdf</span>
+                <div class="path-control"><input type="text" id="fonixdata-path" placeholder="Path to FonixData.cdf" /><button class="secondary" type="button" data-browse-file="fonixdata-path" data-filter-name="FonixData.cdf" data-filter-ext="cdf">Browse&hellip;</button></div>
+              </label>
+              <div class="field-hint">Typically under Skyrim SE's Tools\LipGen\LipGenerator, or from the Creation Kit. Not bundled.</div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-heading"><span class="section-label">FUZ GENERATION</span><h3>xWMAEncode and LipFuzer</h3></div>
+            <div class="form-stack">
+              <label class="field"><span>xWMAEncode.exe</span>
+                <div class="path-control"><input type="text" id="xwma-path" placeholder="Path to xWMAEncode.exe" /><button class="secondary" type="button" data-browse-file="xwma-path" data-filter-name="xWMAEncode.exe" data-filter-ext="exe">Browse&hellip;</button></div>
+              </label>
+              <label class="field"><span>LipFuzer.exe</span>
+                <div class="path-control"><input type="text" id="lipfuzer-path" placeholder="Path to LipFuzer.exe" /><button class="secondary" type="button" data-browse-file="lipfuzer-path" data-filter-name="LipFuzer.exe" data-filter-ext="exe">Browse&hellip;</button></div>
+              </label>
+              <div class="field-hint">Both are needed only for "Generate .fuz files" &mdash; also found under Skyrim SE's Tools\LipGen. Not bundled.</div>
+            </div>
+          </section>
         </section>
 
       </main>
 
-      <!-- ===================== Resizer + Log panel ===================== -->
-      <div class="resizer" id="log-resizer"></div>
-
+      <!-- ===================== Log dock ===================== -->
+      <div class="log-resizer" id="log-resizer" role="separator" aria-orientation="horizontal" title="Drag to resize the log"></div>
       <aside id="log-panel">
-        <div class="log-header">LOG</div>
+        <div class="log-header">
+          <span class="section-label">LOG</span>
+          <span class="spacer"></span>
+          <button class="ghost-button small" id="log-toggle" type="button" title="Hide or show the log">Hide</button>
+          <button class="ghost-button small" id="save-log-btn" type="button">Save log</button>
+          <button class="ghost-button small" id="clear-log-btn" type="button">Clear</button>
+        </div>
         <div id="log-output"></div>
-        <div class="log-footer">
-          <button class="secondary" id="save-log-btn">Save Log</button>
-          <button class="secondary" id="clear-log-btn">Clear Log</button>
-        </div>
       </aside>
-    </div>
-  </div>
-
-  <!-- ===================== Settings modal ===================== -->
-  <div class="modal-overlay" id="settings-modal-overlay">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>Settings</h3>
-        <button class="modal-close" data-close-modal="settings-modal-overlay">&times;</button>
-      </div>
-      <div class="modal-body">
-        <h4 class="modal-section-title">Provider API Keys</h4>
-        <div id="provider-key-rows"></div>
-
-        <div class="checkbox-row">
-          <input type="checkbox" id="show-keys-toggle" />
-          <label for="show-keys-toggle">Show keys</label>
-        </div>
-
-        <hr class="modal-divider" />
-
-        <h4 class="modal-section-title">LIP Generation</h4>
-        <div class="field-row">
-          <div class="grow">
-            <label class="field-label" for="facefx-path">FaceFXWrapper.exe</label>
-            <input type="text" id="facefx-path" placeholder="Path to FaceFXWrapper.exe" />
-          </div>
-          <div class="fixed"><button class="secondary" data-browse-file="facefx-path" data-filter-name="FaceFXWrapper.exe" data-filter-ext="exe">Browse&hellip;</button></div>
-        </div>
-        <div class="field-row">
-          <div class="grow">
-            <label class="field-label" for="fonixdata-path">FonixData.cdf</label>
-            <input type="text" id="fonixdata-path" placeholder="Path to FonixData.cdf" />
-          </div>
-          <div class="fixed"><button class="secondary" data-browse-file="fonixdata-path" data-filter-name="FonixData.cdf" data-filter-ext="cdf">Browse&hellip;</button></div>
-        </div>
-        <div class="field-hint">Typically under Skyrim SE's Tools\LipGen\LipGenerator, or from the Creation Kit. Not bundled.</div>
-
-        <h4 class="modal-section-title" style="margin-top:16px;">FUZ Generation</h4>
-        <div class="field-row">
-          <div class="grow">
-            <label class="field-label" for="xwma-path">xWMAEncode.exe</label>
-            <input type="text" id="xwma-path" placeholder="Path to xWMAEncode.exe" />
-          </div>
-          <div class="fixed"><button class="secondary" data-browse-file="xwma-path" data-filter-name="xWMAEncode.exe" data-filter-ext="exe">Browse&hellip;</button></div>
-        </div>
-        <div class="field-row">
-          <div class="grow">
-            <label class="field-label" for="lipfuzer-path">LipFuzer.exe</label>
-            <input type="text" id="lipfuzer-path" placeholder="Path to LipFuzer.exe" />
-          </div>
-          <div class="fixed"><button class="secondary" data-browse-file="lipfuzer-path" data-filter-name="LipFuzer.exe" data-filter-ext="exe">Browse&hellip;</button></div>
-        </div>
-        <div class="field-hint">Both needed only for "Generate .fuz files" &mdash; also found under Skyrim SE's Tools\LipGen. Not bundled.</div>
-      </div>
-      <div class="modal-footer">
-        <button id="save-settings-btn">Save Settings</button>
-      </div>
     </div>
   </div>
 
@@ -512,8 +464,8 @@
   <div class="modal-overlay" id="help-modal-overlay">
     <div class="modal modal-large">
       <div class="modal-header">
-        <h3>Help &amp; Getting Started</h3>
-        <button class="modal-close" data-close-modal="help-modal-overlay">&times;</button>
+        <h3>Help &amp; getting started</h3>
+        <button class="modal-close" data-close-modal="help-modal-overlay" type="button" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body help-content">
 
@@ -541,7 +493,7 @@
           CSV route below keeps working.</p>
 
         <h4>1. Add your API keys</h4>
-        <p>Open <strong>Settings</strong> from the top menu and paste in the API
+        <p>Open <strong>Settings</strong> from the sidebar and paste in the API
           key for whichever provider(s) you plan to use &mdash; you don't need all
           of them, just the ones you're actually using. <strong>OmniVoice</strong> and
           <strong>Qwen3-TTS</strong> run on your own computer and need no key (see
@@ -569,7 +521,7 @@
           else working on the same mod, or <strong>Import CSV</strong> to load one
           they sent you.</p>
 
-        <h4>3. Try a line with Single-Line Generate</h4>
+        <h4>3. Try a line with Single Line</h4>
         <p>Good for quickly testing a voice before committing to a full batch.
           Pick a provider, model, and voice, type some text, choose where to save
           it, and click <strong>Generate Audio</strong>.</p>
@@ -577,7 +529,7 @@
         <h4>4. Run a full batch</h4>
         <p>Your CSV needs exactly three columns, no header row:</p>
         <pre>EditorID,VoiceType,"Line text"</pre>
-        <p>Point <strong>CSV Batch Generate</strong> at that file and at your mod's
+        <p>Point <strong>Generate</strong> at that file and at your mod's
           Voice folder (e.g. <code>...\Data\Sound\Voice\YourMod.esp</code>) &mdash;
           VoiceForge AIO creates a subfolder per VoiceType automatically. Already-
           generated files are skipped on a re-run unless you check
@@ -614,7 +566,7 @@
         <h4>Troubleshooting tips</h4>
         <ul>
           <li><strong>A provider fails with a rate-limit error:</strong> lower the
-            Concurrency setting in CSV Batch Generate, or just re-run the batch
+            Concurrency setting on the Generate page, or just re-run the batch
             &mdash; already-completed lines are skipped automatically.</li>
           <li><strong>LIP generation fails to open a file:</strong> this is
             usually antivirus briefly locking a freshly-written WAV; the tool
@@ -636,14 +588,14 @@
     <div class="modal modal-small">
       <div class="modal-header">
         <h3>About</h3>
-        <button class="modal-close" data-close-modal="about-modal-overlay">&times;</button>
+        <button class="modal-close" data-close-modal="about-modal-overlay" type="button" aria-label="Close">&times;</button>
       </div>
-      <div class="modal-body" style="text-align:center;">
-        <div class="about-mark">VOICEFORGE <span class="accent">AIO</span></div>
+      <div class="modal-body about-body">
+        <div class="brand-mark big" aria-hidden="true">VF</div>
+        <h2>VoiceForge <span class="accent">AIO</span></h2>
         <p class="about-tagline">Multi-provider TTS + LIP/FUZ pipeline for Skyrim modding</p>
-        <p>Built for the Skyrim modding community by <strong>WinterishClover</strong>,
-          creator of Become High King of Skyrim &mdash; TNG.</p>
-        <button id="patreon-btn">&#9829; Support on Patreon</button>
+        <p>Built for the Skyrim modding community by <strong>WinterishClover</strong>, creator of Become High King of Skyrim &mdash; TNG.</p>
+        <button id="patreon-btn" type="button">&#9829; Support on Patreon</button>
       </div>
     </div>
   </div>

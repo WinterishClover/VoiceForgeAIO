@@ -10,7 +10,7 @@ const T = (ms) => new Promise(r => setTimeout(r, ms));
   fs.copyFileSync(path.join(DATA, 'TestMod.esp'), path.join(EXTRA, 'CoolMod', 'CoolMod.esp')); // a mod folder, as Mod Organizer keeps them
   const b = await h.chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined }); let p = await h.open(b);
   check('auto-detect failure is explained (no Skyrim here)', true);
-  await p.click('[data-open-modal="settings-modal-overlay"]'); await p.fill('.provider-key-input[data-provider="Fake"]', 'good'); await p.click('#save-settings-btn'); await p.keyboard.press('Escape');
+  await p.click('[data-page="settings-page"]'); await p.fill('.provider-key-input[data-provider="Fake"]', 'good'); await p.click('#save-settings-btn'); await p.click('[data-page="voice-mapping-page"]');
   await p.click('#refresh-voices-btn'); await T(700);
   await p.click('[data-page="plugin-dialogue-page"]');
   await p.click('#plugin-detect-btn'); await T(300);
