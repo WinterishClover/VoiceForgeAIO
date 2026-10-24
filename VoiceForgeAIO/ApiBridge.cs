@@ -291,6 +291,7 @@ internal sealed class ApiBridge
         public string ProviderId { get; set; } = "";
         public string VoiceId { get; set; } = "";
         public string VoiceDisplay { get; set; } = "";
+        public string ModelId { get; set; } = "";
     }
 
     private static object ToWireVoiceMapEntry(VoiceMapEntry e) => new
@@ -298,7 +299,8 @@ internal sealed class ApiBridge
         voiceType = e.VoiceType,
         providerId = e.ProviderId,
         voiceId = e.VoiceId,
-        voiceDisplay = e.VoiceDisplay
+        voiceDisplay = e.VoiceDisplay,
+        modelId = e.ModelId
     };
 
     private object SaveVoiceMap(JsonElement args)
@@ -311,7 +313,8 @@ internal sealed class ApiBridge
                 VoiceType = e.VoiceType.Trim(),
                 ProviderId = e.ProviderId,
                 VoiceId = e.VoiceId,
-                VoiceDisplay = e.VoiceDisplay
+                VoiceDisplay = e.VoiceDisplay,
+                ModelId = e.ModelId ?? ""
             }).ToList();
         PersistenceService.SaveVoiceMap(list);
         return new { ok = true, count = list.Count };
@@ -322,9 +325,9 @@ internal sealed class ApiBridge
         string path = args.GetProperty("path").GetString() ?? throw new InvalidOperationException("Missing path.");
         var entries = args.GetProperty("entries").Deserialize<List<WireVoiceMapEntry>>(JsonOpts) ?? new();
 
-        var lines = new List<string> { "VoiceType,ProviderId,VoiceId,VoiceDisplay" };
+        var lines = new List<string> { "VoiceType,ProviderId,VoiceId,VoiceDisplay,ModelId" };
         lines.AddRange(entries.Select(e =>
-            $"{CsvService.Escape(e.VoiceType)},{CsvService.Escape(e.ProviderId)},{CsvService.Escape(e.VoiceId)},{CsvService.Escape(e.VoiceDisplay)}"));
+            $"{CsvService.Escape(e.VoiceType.Trim())},{CsvService.Escape(e.ProviderId)},{CsvService.Escape(e.VoiceId)},{CsvService.Escape(e.VoiceDisplay)},{CsvService.Escape(e.ModelId ?? "")}"));
         File.WriteAllLines(path, lines);
         return new { ok = true, count = entries.Count };
     }
@@ -373,7 +376,8 @@ internal sealed class ApiBridge
                 imported.Add(new
                 {
                     voiceType, providerId = providerId ?? "", voiceId = fields[2].Trim(),
-                    voiceDisplay = fields.Count >= 4 ? fields[3].Trim() : "", needsProvider = providerId == null
+                    voiceDisplay = fields.Count >= 4 ? fields[3].Trim() : "",
+                    modelId = fields.Count >= 5 ? fields[4].Trim() : "", needsProvider = providerId == null
                 });
             }
             else
@@ -382,7 +386,7 @@ internal sealed class ApiBridge
                 imported.Add(new
                 {
                     voiceType, providerId = "", voiceId = fields[1].Trim(),
-                    voiceDisplay = fields[2].Trim(), needsProvider = true
+                    voiceDisplay = fields[2].Trim(), modelId = "", needsProvider = true
                 });
             }
         }
@@ -567,7 +571,7 @@ internal sealed class ApiBridge
         foreach (var e in req.VoiceMap)
         {
             if (string.IsNullOrWhiteSpace(e.VoiceType) || string.IsNullOrWhiteSpace(e.VoiceId)) continue;
-            voiceMap[e.VoiceType] = new VoiceMapEntry { VoiceType = e.VoiceType, ProviderId = e.ProviderId, VoiceId = e.VoiceId, VoiceDisplay = e.VoiceDisplay };
+            voiceMap[e.VoiceType.Trim()] = new VoiceMapEntry { VoiceType = e.VoiceType.Trim(), ProviderId = e.ProviderId, VoiceId = e.VoiceId, VoiceDisplay = e.VoiceDisplay, ModelId = e.ModelId ?? "" };
         }
 
         var credentials = req.ProviderKeys.ToDictionary(

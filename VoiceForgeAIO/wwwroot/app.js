@@ -244,11 +244,23 @@ function buildVoiceMapRow(entry, index) {
     voiceMap[index].providerId = providerSelect.value;
     voiceMap[index].voiceId = "";
     voiceMap[index].voiceDisplay = "";
+    voiceMap[index].modelId = ""; // models belong to a provider
     providerSelect.classList.toggle("warn", !providers.some((p) => p.id === providerSelect.value));
+    rebuildModelSelect(modelSelect, voiceMap[index]);
     rebuildVoiceSelect(voiceSelect, voiceMap[index]);
     markDirty();
   });
   providerTd.appendChild(providerSelect);
+
+  const modelTd = document.createElement("td");
+  const modelSelect = document.createElement("select");
+  rebuildModelSelect(modelSelect, voiceMap[index]);
+  modelSelect.addEventListener("change", () => {
+    voiceMap[index].modelId = modelSelect.value;
+    modelSelect.classList.toggle("warn", !!modelSelect.value && !providerById(voiceMap[index].providerId)?.models.includes(modelSelect.value));
+    markDirty();
+  });
+  modelTd.appendChild(modelSelect);
 
   const voiceTd = document.createElement("td");
   const voiceSelect = document.createElement("select");
@@ -264,8 +276,23 @@ function buildVoiceMapRow(entry, index) {
 
   tr.appendChild(typeTd);
   tr.appendChild(providerTd);
+  tr.appendChild(modelTd);
   tr.appendChild(voiceTd);
   return tr;
+}
+
+/** The Model drop-down offers the models of the row's provider; blank means the provider's default. A saved model the provider no longer lists is kept and flagged. */
+function rebuildModelSelect(selectEl, entry) {
+  const provider = providerById(entry.providerId);
+  const models = provider ? provider.models : [];
+  const saved = entry.modelId || "";
+  const unknown = saved && !models.includes(saved);
+  selectEl.innerHTML =
+    `<option value="">${provider ? `Default (${escapeHtml(provider.defaultModel)})` : "-"}</option>` +
+    (unknown ? `<option value="${escapeAttr(saved)}">${escapeHtml(saved)} (not offered)</option>` : "") +
+    models.map((m) => `<option value="${escapeAttr(m)}">${escapeHtml(m)}</option>`).join("");
+  selectEl.value = saved;
+  selectEl.classList.toggle("warn", !!unknown);
 }
 
 /** Populates a row's Voice <select> from the cached voice list for its current
@@ -298,7 +325,7 @@ function rebuildVoiceSelect(selectEl, entry) {
 }
 
 function addVoiceMapRow() {
-  voiceMap.push({ voiceType: "", providerId: providers[0]?.id || "", voiceId: "", voiceDisplay: "" });
+  voiceMap.push({ voiceType: "", providerId: providers[0]?.id || "", voiceId: "", voiceDisplay: "", modelId: "" });
   selectedRows = new Set([voiceMap.length - 1]);
   lastClickedRow = voiceMap.length - 1;
   renderVoiceMapTable();
@@ -340,6 +367,7 @@ function reportMappingProblems(entries) {
     const name = e.voiceType.trim();
     if (!providers.some((p) => p.id === e.providerId)) { appendLog(`Warning: '${name}' has no valid provider selected.`, "error"); problems++; }
     else if (!e.voiceId) { appendLog(`Warning: '${name}' has no voice selected; its lines will fail.`, "error"); problems++; }
+    else if (e.modelId && !providers.find((p) => p.id === e.providerId).models.includes(e.modelId)) { appendLog(`Warning: '${name}' uses model '${e.modelId}', which its provider no longer offers; the provider's default model will be used.`, "error"); problems++; }
   }
   return problems;
 }
@@ -386,6 +414,7 @@ async function importVoiceMapCsv() {
       if (owners.length === 1) e.providerId = owners[0];
     }
     delete e.needsProvider;
+    e.modelId = e.modelId || "";
     const existing = voiceMap.find((v) => v.voiceType.toLowerCase() === e.voiceType.toLowerCase());
     if (existing) {
       Object.assign(existing, e);
@@ -601,7 +630,7 @@ function wirePluginDialogue() {
     addVoiceTypes(names) {
       // New rows start on the provider used by the last row, since a mod usually uses one provider for most of its voices.
       const providerId = voiceMap.length ? voiceMap[voiceMap.length - 1].providerId : (providers[0]?.id || "");
-      for (const name of names) voiceMap.push({ voiceType: name, providerId, voiceId: "", voiceDisplay: "" });
+      for (const name of names) voiceMap.push({ voiceType: name, providerId, voiceId: "", voiceDisplay: "", modelId: "" });
       renderVoiceMapTable();
       markDirty();
     },

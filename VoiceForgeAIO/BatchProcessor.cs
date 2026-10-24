@@ -130,7 +130,7 @@ internal sealed class BatchProcessor
                 string statusSuffix = "";
                 if (!File.Exists(item.WavPath) || options.Overwrite)
                 {
-                    byte[] audio = await item.Provider.SynthesizeAsync(creds, item.Row.Text, item.Map.VoiceId, item.Provider.DefaultModel, ct);
+                    byte[] audio = await item.Provider.SynthesizeAsync(creds, item.Row.Text, item.Map.VoiceId, ModelFor(item.Provider, item.Map), ct);
                     await File.WriteAllBytesAsync(item.WavPath, WavHeaderFixup.NormalizeHeader(audio), ct);
                 }
 
@@ -216,6 +216,10 @@ internal sealed class BatchProcessor
         // Counted as lines finish, so a stopped batch reports what it really made.
         return (succeeded, failedCount, skipped, failures.ToList());
     }
+
+    /// <summary>The model chosen for this mapping row, or the provider's default when none is chosen (or the saved one no longer exists).</summary>
+    internal static string ModelFor(ITtsProvider provider, VoiceMapEntry map) =>
+        !string.IsNullOrWhiteSpace(map.ModelId) && provider.AvailableModels.Contains(map.ModelId) ? map.ModelId : provider.DefaultModel;
 
     private static string SanitizeFileName(string name)
     {

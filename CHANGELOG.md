@@ -25,6 +25,12 @@ The biggest update so far: VoiceForge can now read your mod's dialogue straight 
 - New **Local Voices** page: point it at each engine's Python (optionally run inside WSL), **Check the install**, make voices, and **Hear sample**. Models load on first use and unload after a quiet spell so your graphics card is free again.
 - Local voices work everywhere cloud voices do: Voice Mapping, Single Line and Generate. Install guides: `docs/omnivoice.md` and `docs/qwen3-tts.md`.
 
+**ElevenLabs Eleven v4, and a model for every voice**
+- **Eleven v4** (`eleven_v4`) and **Eleven v4 Turbo** (`eleven_v4_turbo`) are now available for ElevenLabs. The default model is unchanged.
+- Voice Mapping has a new **Model** column. The model you pick for a VoiceType is used everywhere, including **Generate** (CSV or plugin); previously only Single Line let you choose and every batch silently used the provider's default. Leave it on "Default" and nothing changes for existing mappings.
+- It works for every provider, so you can also choose per voice, for example OmniVoice 32 or 16 steps.
+- Mapping CSV export/import carries the model as a new `ModelId` column. Older mapping files still import.
+
 **New look**
 - The interface now matches StoryLoom: dark panels with an amber accent, serif page titles, rounded cards and a collapsible sidebar.
 - Settings is now a page rather than a pop-up, and each API key shows whether one is entered.
@@ -59,7 +65,7 @@ The biggest update so far: VoiceForge can now read your mod's dialogue straight 
 ### For builders
 - New requirement for building: the Mutagen package (restored automatically).
 - Fixed invalid XML in `FolderProfile.pubxml` that stopped `dotnet publish` from loading it.
-- Added `tests/e2e`: end-to-end tests that drive the real backend and UI against generated plugins and fake providers (75 checks). See its README.
+- Added `tests/e2e`: end-to-end tests that drive the real backend and UI against generated plugins and fake providers (80 checks). See its README.
 
 ### Known limits
 - Only Skyrim Special Edition plugins are read.

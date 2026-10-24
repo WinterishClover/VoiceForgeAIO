@@ -154,18 +154,19 @@
             <div><span class="eyebrow">WHO SPEAKS WITH WHICH VOICE</span><h2>Voice Mapping</h2></div>
             <div class="hero-actions"><button class="secondary" id="refresh-voices-btn" type="button">Get available voices</button></div>
           </header>
-          <p class="page-intro">Map each Skyrim VoiceType (the audio folder name) to a provider and voice, once. Click a row to select it; Ctrl-click or Shift-click for several. Rows marked in amber still need attention.</p>
+          <p class="page-intro">Map each Skyrim VoiceType (the audio folder name) to a provider, model and voice, once. The model is used everywhere (Generate included); leave it on the provider default if you are unsure. Click a row to select it; Ctrl-click or Shift-click for several. Rows marked in amber still need attention.</p>
 
           <section class="settings-card">
             <div class="settings-heading row">
-              <div><span class="section-label">VOICETYPE &rarr; PROVIDER + VOICE</span><h3>Mapping table</h3></div>
+              <div><span class="section-label">VOICETYPE &rarr; PROVIDER + MODEL + VOICE</span><h3>Mapping table</h3></div>
               <span class="status-pill" id="voice-count-badge">No voices loaded yet</span>
             </div>
             <div class="table-wrap tall">
               <table class="grid" id="voice-map-table">
                 <thead><tr>
-                  <th style="width:32%;">VoiceType (Skyrim folder name)</th>
-                  <th style="width:24%;">Provider</th>
+                  <th style="width:24%;">VoiceType (Skyrim folder name)</th>
+                  <th style="width:19%;">Provider</th>
+                  <th style="width:19%;">Model</th>
                   <th>Voice</th>
                 </tr></thead>
                 <tbody id="voice-map-body"></tbody>

@@ -11,7 +11,7 @@ const csvRun = async (p, name, content, conc) => { const csv = path.join(h.OUT, 
   // V1 trim (typed with trailing space, saved without leaving the field)
   await p.click('#add-row-btn'); await p.keyboard.type('Eldis '); // focus is on the new row's input
   let r = await h.rows(p); check('add-row focuses the new VoiceType box', r.length === 1 && r[0].type === 'Eldis ');
-  const tr0 = (await p.$$('#voice-map-body tr'))[0]; await (await tr0.$$('select'))[0].selectOption('Fake'); await (await tr0.$$('select'))[1].selectOption('f2');
+  const tr0 = (await p.$$('#voice-map-body tr'))[0]; await (await tr0.$$('select'))[0].selectOption('Fake'); await (await tr0.$$('select'))[2].selectOption('f2');
   check('Save button shows unsaved marker', (await p.textContent('#save-mapping-btn')).includes('*'));
   await p.click('#save-mapping-btn'); await p.waitForTimeout(400);
   check('VoiceType trimmed on save', mapFile()[0].VoiceType === 'Eldis', JSON.stringify(mapFile()));
@@ -21,8 +21,8 @@ const csvRun = async (p, name, content, conc) => { const csv = path.join(h.OUT, 
   let log = await h.logText(p); check('case-variant duplicate blocks save with a message', log.some(l => /Not saved.*more than once.*Eldis/i.test(l)) && mapFile().length === 1, log.slice(-1)[0]);
   // V3 missing voice warning
   await p.click('#voice-map-body tr:nth-child(2) input', { clickCount: 3 }); await p.keyboard.type('Beta'); await p.keyboard.press('Tab');
-  const t2 = (await p.$$('#voice-map-body tr'))[1]; await (await t2.$$('select'))[1].selectOption(''); 
-  check('row without a voice is marked', await (await t2.$$('select'))[1].evaluate(e => e.classList.contains('warn')));
+  const t2 = (await p.$$('#voice-map-body tr'))[1]; await (await t2.$$('select'))[2].selectOption(''); 
+  check('row without a voice is marked', await (await t2.$$('select'))[2].evaluate(e => e.classList.contains('warn')));
   await p.click('#save-mapping-btn'); await p.waitForTimeout(300); log = await h.logText(p);
   check('save warns about the row without a voice', log.some(l => /'Beta' has no voice/.test(l)), log.slice(-3).join('|'));
   // V4 selection
@@ -55,7 +55,7 @@ const csvRun = async (p, name, content, conc) => { const csv = path.join(h.OUT, 
   await p.click('#save-mapping-btn'); await p.waitForTimeout(300);
   // V6 failed refresh keeps lists
   await fetch(`http://localhost:${h.port()}/test/fake?voicesFail=1`); await p.click('#refresh-voices-btn'); await p.waitForTimeout(800);
-  const opts = await p.$$eval('#voice-map-body tr:nth-child(1) td:nth-child(3) option', o => o.map(x => x.textContent));
+  const opts = await p.$$eval('#voice-map-body tr:nth-child(1) td:nth-child(4) option', o => o.map(x => x.textContent));
   check('failed refresh keeps the previous voice list', opts.length === 2, JSON.stringify(opts));
   await fetch(`http://localhost:${h.port()}/test/fake?voicesFail=0`);
   // V8 batch behaviours
@@ -76,15 +76,33 @@ const csvRun = async (p, name, content, conc) => { const csv = path.join(h.OUT, 
   await p.click('[data-page="local-voices-page"]'); await p.click('#qwenSection > summary'); await p.fill('#qwenPython', '/usr/bin/python3'); await T(800);
   check('opening a card does not wipe typed text', (await p.inputValue('#qwenPython')) === '/usr/bin/python3');
   await p.click('#qwenSaveButton'); await T(500); await p.fill('#qwenVoiceName', 'Sage'); await p.fill('#qwenVoiceInstruct', 'wise'); await p.click('#qwenVoiceSaveButton'); await T(500);
-  await p.click('[data-page="voice-mapping-page"]'); await h.addRow(p, 'Sagey', 'Qwen3TTS'); const lastRow = (await p.$$('#voice-map-body tr')).pop(); const sel = (await lastRow.$$('select'))[1]; const qid = await sel.$$eval('option', o => o.map(x => x.value).filter(Boolean)[0]); await sel.selectOption(qid);
+  await p.click('[data-page="voice-mapping-page"]'); await h.addRow(p, 'Sagey', 'Qwen3TTS'); const lastRow = (await p.$$('#voice-map-body tr')).pop(); const sel = (await lastRow.$$('select'))[2]; const qid = await sel.$$eval('option', o => o.map(x => x.value).filter(Boolean)[0]); await sel.selectOption(qid);
   check('local voice shown by name, not raw id', (await sel.$$eval('option', o => o.map(x => x.textContent))).includes('Sage'), JSON.stringify(await sel.$$eval('option', o => o.map(x => x.textContent))));
   await p.click('#save-mapping-btn'); await T(300);
   await p.click('[data-page="local-voices-page"]'); await p.click('#qwenVoiceDeleteButton'); await T(500); await p.click('[data-page="voice-mapping-page"]');
-  const sag = (await p.$$eval('#voice-map-body tr', trs => trs.map(t => ({ n: t.querySelector('input').value, w: t.querySelectorAll('select')[1].classList.contains('warn'), t: t.querySelectorAll('select')[1].selectedOptions[0]?.textContent })))).find(x => x.n === 'Sagey');
+  const sag = (await p.$$eval('#voice-map-body tr', trs => trs.map(t => ({ n: t.querySelector('input').value, w: t.querySelectorAll('select')[2].classList.contains('warn'), t: t.querySelectorAll('select')[2].selectedOptions[0]?.textContent })))).find(x => x.n === 'Sagey');
   check('deleted local voice is flagged on the row', sag.w && /not found/.test(sag.t), JSON.stringify(sag));
   await p.click('[data-page="single-line-page"]'); await p.selectOption('#single-provider', 'Fake'); await p.selectOption('#single-model', 'fake-2');
   await p.click('[data-page="local-voices-page"]'); await p.click('#qwenNewButton'); await p.fill('#qwenVoiceName', 'Tmp'); await p.fill('#qwenVoiceInstruct', 'x'); await p.click('#qwenVoiceSaveButton'); await T(500);
   await p.click('[data-page="single-line-page"]'); check('Single-Line model survives a voice list change', (await p.inputValue('#single-model')) === 'fake-2');
+  // Models: the Model column reaches Generate (all functions, not just Single Line)
+  await p.click('[data-page="voice-mapping-page"]');
+  const kayRow = (await p.$$('#voice-map-body tr'))[(await h.rows(p)).findIndex(x => x.type === 'Kaylin')];
+  const modelSel = (await kayRow.$$('select'))[1];
+  check('Model column offers Default plus the provider models', JSON.stringify(await modelSel.$$eval('option', o => o.map(x => x.value))) === JSON.stringify(['', 'fake-1', 'fake-2']));
+  await modelSel.selectOption('fake-2'); await p.click('#save-mapping-btn'); await T(300);
+  check('chosen model is saved with the mapping', mapFile().find(e => e.VoiceType === 'Kaylin').ModelId === 'fake-2');
+  const before = (await (await fetch(`http://localhost:${h.port()}/test/models`)).text()).split(',').filter(Boolean).length;
+  await csvRun(p, 'modelrun', 'M1,Kaylin,"model check"\n');
+  const used = (await (await fetch(`http://localhost:${h.port()}/test/models`)).text()).split(',').filter(Boolean).slice(before);
+  check('Generate uses the mapped model', used.length === 1 && used[0] === 'fake-2', JSON.stringify(used));
+  await p.click('[data-page="voice-mapping-page"]'); await (await kayRow.$$('select'))[1].selectOption(''); await p.click('#save-mapping-btn'); await T(300);
+  const before2 = (await (await fetch(`http://localhost:${h.port()}/test/models`)).text()).split(',').filter(Boolean).length;
+  await csvRun(p, 'modelrun2', 'M2,Kaylin,"default model"\n');
+  const used2 = (await (await fetch(`http://localhost:${h.port()}/test/models`)).text()).split(',').filter(Boolean).slice(before2);
+  check('blank model falls back to the provider default', used2.length === 1 && used2[0] === 'fake-1', JSON.stringify(used2));
+  const mexp = path.join(h.OUT, 'models.csv'); await p.click('[data-page="voice-mapping-page"]'); await h.dialog(mexp); await p.click('#export-csv-btn'); await T(400);
+  check('Export CSV includes a ModelId column', /^VoiceType,ProviderId,VoiceId,VoiceDisplay,ModelId/.test(fs.readFileSync(mexp, 'utf8')));
   // UI shell: sidebar, log dock, key status, modals, no outside requests
   await p.click('[data-page="settings-page"]');
   check('Settings is a page and shows which keys are entered', (await p.textContent('.provider-key-input[data-provider="Fake"] >> xpath=../div/em')) === 'Key entered' && (await p.textContent('.provider-key-input[data-provider="Inworld"] >> xpath=../div/em')) === 'Not set');

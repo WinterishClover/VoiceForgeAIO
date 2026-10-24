@@ -34,6 +34,7 @@ internal static class Host
                     else if (path == "/test/makeplugin") { PluginMaker.Make(req.QueryString["dir"]!); res.StatusCode = 204; }
                     else if (path == "/test/makelocalized") { PluginMaker.MakeLocalized(req.QueryString["dir"]!); res.StatusCode = 204; }
                     else if (path == "/test/fake") { FakeCloudProviderCtl(req.QueryString["voicesFail"]); res.StatusCode = 204; }
+                    else if (path == "/test/models") { var b = Encoding.UTF8.GetBytes(string.Join(",", Providers.FakeCloudProvider.Models)); await res.OutputStream.WriteAsync(b); }
                     else if (path == "/test/calls") { var b = Encoding.UTF8.GetBytes(Providers.FakeCloudProvider.Calls.ToString()); await res.OutputStream.WriteAsync(b); }
                     else
                     {

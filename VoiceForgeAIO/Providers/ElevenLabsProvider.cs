@@ -8,7 +8,7 @@ internal sealed class ElevenLabsProvider : ITtsProvider
 {
     public string Id => "ElevenLabs";
     public string DisplayName => "ElevenLabs";
-    public IReadOnlyList<string> AvailableModels { get; } = new[] { "eleven_v3", "eleven_multilingual_v2", "eleven_flash_v2_5", "eleven_turbo_v2_5" };
+    public IReadOnlyList<string> AvailableModels { get; } = new[] { "eleven_v4", "eleven_v4_turbo", "eleven_v3", "eleven_multilingual_v2", "eleven_flash_v2_5", "eleven_turbo_v2_5" };
     public string DefaultModel => "eleven_multilingual_v2";
     // ElevenLabs can return a native WAV container directly via output_format=wav_*.
     // Per their docs, only the 44.1kHz variant is gated to the Pro tier and above --

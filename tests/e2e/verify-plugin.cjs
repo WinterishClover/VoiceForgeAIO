@@ -51,7 +51,7 @@ const T = (ms) => new Promise(r => setTimeout(r, ms));
   await p.click('#plugin-add-mapping-btn'); await T(300);
   check('jumps to Voice Mapping', await p.isVisible('#voice-map-body'));
   let rows = await h.rows(p); check('adds rows for ticked voice types only (not Unknown)', rows.length === 4 && !rows.some(r => r.type === 'Unknown'), JSON.stringify(rows.map(r => r.type)));
-  for (let i = 0; i < 4; i++) { const tr = (await p.$$('#voice-map-body tr'))[i]; await (await tr.$$('select'))[0].selectOption('Fake'); await (await tr.$$('select'))[1].selectOption('f1'); }
+  for (let i = 0; i < 4; i++) { const tr = (await p.$$('#voice-map-body tr'))[i]; await (await tr.$$('select'))[0].selectOption('Fake'); await (await tr.$$('select'))[2].selectOption('f1'); }
   await p.click('#save-mapping-btn'); await T(300);
   await p.click('[data-page="plugin-dialogue-page"]'); await T(400);
   check('mapping status turns green after mapping', (await p.$$eval('#plugin-vt-body tr', trs => trs.filter(t => t.querySelector('input').checked).every(t => /Fake Cloud/.test(t.children[4].textContent)))));

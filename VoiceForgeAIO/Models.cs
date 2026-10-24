@@ -14,6 +14,9 @@ internal sealed class VoiceMapEntry
 
     /// <summary>Display name shown in the grid combo; not sent to any API.</summary>
     public string VoiceDisplay { get; set; } = "";
+
+    /// <summary>The provider model to use for this VoiceType (e.g. "eleven_v4"). Empty = the provider's default model.</summary>
+    public string ModelId { get; set; } = "";
 }
 
 /// <summary>One row parsed from a batch CSV: EditorID,VoiceType,"Text".</summary>
