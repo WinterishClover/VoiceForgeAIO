@@ -58,6 +58,9 @@ internal sealed class AppSettingsModel
 
     public bool HasSeenSplash { get; set; } = false;
 
+    /// <summary>The model each provider uses unless a Voice Mapping row picks its own (providerId -> model). Missing = the provider's built-in default.</summary>
+    public Dictionary<string, string> DefaultModels { get; set; } = new();
+
     /// <summary>Skyrim's Data folder, where plugins are listed from. Empty = not set (auto-detect offered).</summary>
     public string SkyrimDataPath { get; set; } = "";
     /// <summary>Optional second place to look for plugins, e.g. Mod Organizer 2's "mods" folder (scanned one level deep).</summary>

@@ -37,7 +37,13 @@ internal sealed class BatchProcessor
 {
     private readonly Dictionary<string, ProviderCredentials> _credentialsByProvider;
 
-    public BatchProcessor(Dictionary<string, ProviderCredentials> credentialsByProvider) => _credentialsByProvider = credentialsByProvider;
+    private readonly Dictionary<string, string> _defaultModels;
+
+    public BatchProcessor(Dictionary<string, ProviderCredentials> credentialsByProvider, Dictionary<string, string>? defaultModels = null)
+    {
+        _credentialsByProvider = credentialsByProvider;
+        _defaultModels = defaultModels ?? new();
+    }
 
     public async Task<(int Success, int Failed, int Skipped, List<(CsvRow Row, string Error)> Failures)> RunAsync(
         List<CsvRow> rows,
@@ -130,7 +136,7 @@ internal sealed class BatchProcessor
                 string statusSuffix = "";
                 if (!File.Exists(item.WavPath) || options.Overwrite)
                 {
-                    byte[] audio = await item.Provider.SynthesizeAsync(creds, item.Row.Text, item.Map.VoiceId, ModelFor(item.Provider, item.Map), ct);
+                    byte[] audio = await item.Provider.SynthesizeAsync(creds, item.Row.Text, item.Map.VoiceId, ModelFor(item.Provider, item.Map, _defaultModels), ct);
                     await File.WriteAllBytesAsync(item.WavPath, WavHeaderFixup.NormalizeHeader(audio), ct);
                 }
 
@@ -217,9 +223,16 @@ internal sealed class BatchProcessor
         return (succeeded, failedCount, skipped, failures.ToList());
     }
 
-    /// <summary>The model chosen for this mapping row, or the provider's default when none is chosen (or the saved one no longer exists).</summary>
-    internal static string ModelFor(ITtsProvider provider, VoiceMapEntry map) =>
-        !string.IsNullOrWhiteSpace(map.ModelId) && provider.AvailableModels.Contains(map.ModelId) ? map.ModelId : provider.DefaultModel;
+    /// <summary>
+    /// The model a line is made with: the one chosen on its Voice Mapping row, else the one chosen for the provider in Settings,
+    /// else the provider's built-in default. A saved choice the provider no longer offers is skipped.
+    /// </summary>
+    internal static string ModelFor(ITtsProvider provider, VoiceMapEntry map, IReadOnlyDictionary<string, string> settingsModels)
+    {
+        if (!string.IsNullOrWhiteSpace(map.ModelId) && provider.AvailableModels.Contains(map.ModelId)) return map.ModelId;
+        if (settingsModels.TryGetValue(provider.Id, out var chosen) && provider.AvailableModels.Contains(chosen)) return chosen;
+        return provider.DefaultModel;
+    }
 
     private static string SanitizeFileName(string name)
     {

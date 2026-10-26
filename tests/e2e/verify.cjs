@@ -101,6 +101,26 @@ const csvRun = async (p, name, content, conc) => { const csv = path.join(h.OUT, 
   await csvRun(p, 'modelrun2', 'M2,Kaylin,"default model"\n');
   const used2 = (await (await fetch(`http://localhost:${h.port()}/test/models`)).text()).split(',').filter(Boolean).slice(before2);
   check('blank model falls back to the provider default', used2.length === 1 && used2[0] === 'fake-1', JSON.stringify(used2));
+  // Settings model: used by Generate unless the row picks its own
+  const kayNow = async () => (await p.$$('#voice-map-body tr'))[(await h.rows(p)).findIndex(x => x.type === 'Kaylin')];
+  await p.click('[data-page="settings-page"]');
+  check('Settings lists a model selector for providers with several models', (await p.$$eval('#default-models select', s => s.map(x => x.dataset.provider))).includes('Fake'));
+  check('...but not for providers with a single model', !(await p.$$eval('#default-models select', s => s.map(x => x.dataset.provider))).includes('Qwen3TTS'));
+  await p.selectOption('#default-model-Fake', 'fake-2'); await p.click('#save-settings-btn'); await T(300);
+  await p.click('[data-page="voice-mapping-page"]');
+  check('mapping rows on Default show the Settings model', (await (await (await kayNow()).$$eval('select', s => s[1].options[0].textContent))) === 'Default - fake-2');
+  let mark = (await (await fetch(`http://localhost:${h.port()}/test/models`)).text()).split(',').filter(Boolean).length;
+  await csvRun(p, 'settingsmodel', 'S1,Kaylin,"settings model"\n');
+  let got = (await (await fetch(`http://localhost:${h.port()}/test/models`)).text()).split(',').filter(Boolean).slice(mark);
+  check('Generate uses the Settings model when the row is on Default', got.length === 1 && got[0] === 'fake-2', JSON.stringify(got));
+  await p.click('[data-page="voice-mapping-page"]'); await (await (await kayNow()).$$('select'))[1].selectOption('fake-1'); await p.click('#save-mapping-btn'); await T(300);
+  mark = (await (await fetch(`http://localhost:${h.port()}/test/models`)).text()).split(',').filter(Boolean).length;
+  await csvRun(p, 'rowmodel', 'S2,Kaylin,"row model wins"\n');
+  got = (await (await fetch(`http://localhost:${h.port()}/test/models`)).text()).split(',').filter(Boolean).slice(mark);
+  check("a row's own model overrides the Settings model", got.length === 1 && got[0] === 'fake-1', JSON.stringify(got));
+  await p.click('[data-page="single-line-page"]'); await p.selectOption('#single-provider', 'Fake');
+  check('Single Line starts on the Settings model', (await p.inputValue('#single-model')) === 'fake-2');
+  await p.click('[data-page="voice-mapping-page"]'); await (await (await kayNow()).$$('select'))[1].selectOption(''); await p.click('#save-mapping-btn'); await T(300);
   const mexp = path.join(h.OUT, 'models.csv'); await p.click('[data-page="voice-mapping-page"]'); await h.dialog(mexp); await p.click('#export-csv-btn'); await T(400);
   check('Export CSV includes a ModelId column', /^VoiceType,ProviderId,VoiceId,VoiceDisplay,ModelId/.test(fs.readFileSync(mexp, 'utf8')));
   // UI shell: sidebar, log dock, key status, modals, no outside requests
@@ -114,6 +134,7 @@ const csvRun = async (p, name, content, conc) => { const csv = path.join(h.OUT, 
   await p.close(); await h.stopHost(); await h.startHost(); p = await h.open(b);
   r = await h.rows(p); const kay = r.find(x => x.type === 'Kaylin');
   check('after restart the voice list is already there', kay && kay.voiceLabels.length === 2, JSON.stringify(kay));
+  await p.click('[data-page="settings-page"]'); check('the Settings model is remembered after a restart', (await p.inputValue('#default-model-Fake')) === 'fake-2');
   check('badge says the lists are remembered', /remembered/.test(await p.textContent('#voice-count-badge')), await p.textContent('#voice-count-badge'));
   check('no page errors', p.errs.length === 0, JSON.stringify(p.errs));
   const bad = results.filter(x => !x[1]); console.log(`\n${results.length - bad.length}/${results.length} passed`); await b.close(); await h.stopHost(); process.exit(bad.length ? 1 : 0);

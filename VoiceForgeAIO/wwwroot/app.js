@@ -12,11 +12,19 @@ let voiceMap = [];           // [{voiceType, providerId, voiceId, voiceDisplay}]
 let voicesByProvider = {};   // {providerId: [{voiceId, displayName, description}]}
 let batchRunning = false;
 let batchPaused = false;
+let defaultModels = {};      // {providerId: model} chosen in Settings; used when a mapping row has no model of its own
 let selectedRows = new Set(); // indices of selected Voice Mapping rows
 let lastClickedRow = -1;
 let mappingDirty = false;     // edited since the last Save Mapping
 
 const providerById = (id) => providers.find((p) => p.id === id);
+
+/** The model a provider runs when nothing more specific is chosen: the Settings choice, else the provider's built-in default. */
+function effectiveDefaultModel(providerId) {
+  const p = providerById(providerId);
+  if (!p) return "";
+  return p.models.includes(defaultModels[providerId]) ? defaultModels[providerId] : p.defaultModel;
+}
 
 // ==========================================================================
 // Init
@@ -26,13 +34,17 @@ async function init() {
   wireStaticHandlers();
 
   const state = await call("getInitialState");
+  // A returning user shouldn't see the welcome card flash while the rest of start-up runs.
+  if (state.hasSeenSplash) document.getElementById("splash-overlay").classList.add("hidden");
   providers = Array.from(state.providers);
   providerKeys = state.providerKeys;
   voiceMap = Array.from(state.voiceMap);
+  defaultModels = { ...(state.settings.defaultModels || {}) };
   // Voices fetched on an earlier run, so mappings are usable straight away (Get Available Voices refreshes them).
   voicesByProvider = Object.fromEntries(Object.entries(state.cachedVoices || {}).map(([id, list]) => [id, Array.from(list)]));
 
   renderProviderKeyRows();
+  renderDefaultModelRows();
   renderProviderSelect(document.getElementById("single-provider"));
   applySettingsToForm(state.settings);
   renderVoiceMapTable();
@@ -45,10 +57,6 @@ async function init() {
 
   // Local providers (OmniVoice, Qwen3-TTS) list the voices made on the Local Voices page.
   await initLocalVoices(onLocalVoicesChanged).catch((err) => appendLog(`Local voices: ${err.message}`, "error"));
-
-  if (state.hasSeenSplash) {
-    document.getElementById("splash-overlay").classList.add("hidden");
-  }
 
   updateVoiceBadge(Object.keys(state.cachedVoices || {}).length > 0);
   appendLog('Ready. Enter your API keys in Settings, then "Get Available Voices" before building the Voice Mapping table.');
@@ -126,6 +134,32 @@ function renderProviderKeyRows() {
         </div>`;
       container.appendChild(groupRow);
     }
+  }
+}
+
+/** Settings: one model drop-down per provider that offers more than one. */
+function renderDefaultModelRows() {
+  const container = document.getElementById("default-models");
+  container.innerHTML = "";
+  for (const p of providers.filter((x) => x.models.length > 1)) {
+    const row = document.createElement("div");
+    row.className = "field-row";
+    row.innerHTML = `
+      <div class="grow">
+        <div class="field-title"><label class="field-label" for="default-model-${escapeAttr(p.id)}">${escapeHtml(p.displayName)}</label><em class="key-status">Built-in default: ${escapeHtml(p.defaultModel)}</em></div>
+        <select id="default-model-${escapeAttr(p.id)}" data-provider="${escapeAttr(p.id)}">
+          ${p.models.map((m) => `<option value="${escapeAttr(m)}">${escapeHtml(m)}</option>`).join("")}
+        </select>
+      </div>`;
+    const select = row.querySelector("select");
+    select.value = effectiveDefaultModel(p.id);
+    select.addEventListener("change", () => {
+      defaultModels[p.id] = select.value;
+      renderVoiceMapTable();        // the "Default - model" labels follow
+      refreshSingleLineDropdowns(); // Single Line starts on it
+      if (document.getElementById("single-provider").value === p.id) document.getElementById("single-model").value = select.value;
+    });
+    container.appendChild(row);
   }
 }
 
@@ -288,7 +322,7 @@ function rebuildModelSelect(selectEl, entry) {
   const saved = entry.modelId || "";
   const unknown = saved && !models.includes(saved);
   selectEl.innerHTML =
-    `<option value="">${provider ? `Default (${escapeHtml(provider.defaultModel)})` : "-"}</option>` +
+    `<option value="">${provider ? `Default - ${escapeHtml(effectiveDefaultModel(entry.providerId))}` : "-"}</option>` +
     (unknown ? `<option value="${escapeAttr(saved)}">${escapeHtml(saved)} (not offered)</option>` : "") +
     models.map((m) => `<option value="${escapeAttr(m)}">${escapeHtml(m)}</option>`).join("");
   selectEl.value = saved;
@@ -471,7 +505,7 @@ function refreshSingleLineDropdowns() {
   const keepModel = modelSelect.value, keepVoice = voiceSelect.value;
 
   modelSelect.innerHTML = provider ? provider.models.map((m) => `<option value="${m}">${m}</option>`).join("") : "";
-  if (provider && provider.models.includes(keepModel)) modelSelect.value = keepModel;
+  if (provider) modelSelect.value = provider.models.includes(keepModel) ? keepModel : effectiveDefaultModel(providerId);
 
   const voices = voicesByProvider[providerId] || [];
   voiceSelect.innerHTML = voices.length
@@ -568,6 +602,7 @@ async function startBatch() {
     csvPath, voiceFolder,
     source: fromPlugin ? "plugin" : "csv",
     includeVoiceTypes: fromPlugin ? pluginPage.includedVoiceTypes() : null,
+    defaultModels,
     concurrency: Number(document.getElementById("batch-concurrency").value) || 3,
     overwrite: document.getElementById("batch-overwrite").checked,
     generateLip, generateFuz,
@@ -790,6 +825,7 @@ async function saveAllSettings(silent = false) {
     lipGenerationEnabled: document.getElementById("batch-lip").checked,
     fuzGenerationEnabled: document.getElementById("batch-fuz").checked,
     lastProviderId: document.getElementById("single-provider").value,
+    defaultModels,
     skyrimDataPath: pluginPage.dataFolder(),
     extraPluginFolder: pluginPage.extraFolder()
   });

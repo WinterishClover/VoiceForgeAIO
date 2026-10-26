@@ -138,6 +138,7 @@ internal sealed class ApiBridge
                 lipGenerationEnabled = s.LipGenerationEnabled,
                 fuzGenerationEnabled = s.FuzGenerationEnabled,
                 lastProviderId = s.LastProviderId,
+                defaultModels = s.DefaultModels,
                 skyrimDataPath = s.SkyrimDataPath,
                 extraPluginFolder = s.ExtraPluginFolder
             },
@@ -164,6 +165,7 @@ internal sealed class ApiBridge
         public string LastProviderId { get; set; } = "Inworld";
         public string SkyrimDataPath { get; set; } = "";
         public string ExtraPluginFolder { get; set; } = "";
+        public Dictionary<string, string> DefaultModels { get; set; } = new();
     }
     private sealed class ProviderKeyPair { public string ApiKey { get; set; } = ""; public string GroupId { get; set; } = ""; }
 
@@ -194,6 +196,9 @@ internal sealed class ApiBridge
         s.LipGenerationEnabled = req.LipGenerationEnabled;
         s.FuzGenerationEnabled = req.FuzGenerationEnabled;
         s.LastProviderId = req.LastProviderId;
+        s.DefaultModels = req.DefaultModels
+            .Where(kv => TtsProviderRegistry.TryGet(kv.Key, out var p) && p.AvailableModels.Contains(kv.Value))
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
         s.SkyrimDataPath = req.SkyrimDataPath.Trim();
         s.ExtraPluginFolder = req.ExtraPluginFolder.Trim();
 
@@ -528,6 +533,8 @@ internal sealed class ApiBridge
         public string Source { get; set; } = "csv";
         /// <summary>For the plugin source: only these VoiceTypes (null/empty = all).</summary>
         public List<string>? IncludeVoiceTypes { get; set; }
+        /// <summary>The model chosen per provider in Settings (providerId -> model), as currently shown.</summary>
+        public Dictionary<string, string> DefaultModels { get; set; } = new();
         public string VoiceFolder { get; set; } = "";
         public int Concurrency { get; set; } = 3;
         public bool Overwrite { get; set; }
@@ -604,7 +611,7 @@ internal sealed class ApiBridge
         var pauseGate = _pauseGate;
         _ = Task.Run(async () =>
         {
-            var processor = new BatchProcessor(credentials);
+            var processor = new BatchProcessor(credentials, req.DefaultModels);
             var progress = new Progress<BatchProgress>(p => PushEvent("batchProgress", new
             {
                 completed = p.Completed,

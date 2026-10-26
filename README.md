@@ -19,9 +19,13 @@ Install steps: [docs/omnivoice.md](docs/omnivoice.md) and
 [docs/qwen3-tts.md](docs/qwen3-tts.md). The Python bridge scripts they use
 live in `VoiceForgeAIO/tools/` and ship next to the exe.
 
-## Models per voice
+## Models per provider and per voice
 
-Voice Mapping has a **Model** column next to the provider. The chosen model is used for that VoiceType everywhere,
+**Settings → Model for each provider** picks the model Generate (CSV or plugin) and Single Line use for that provider
+(Inworld, ElevenLabs, MiniMax, Cartesia, Fish Audio, OmniVoice). Order of precedence for a line: the model chosen on its
+Voice Mapping row, then the Settings model, then the provider's built-in default.
+
+Voice Mapping also has a **Model** column next to the provider. The chosen model is used for that VoiceType everywhere,
 including **Generate** (CSV or plugin); "Default" uses the provider's default model, so older mappings behave as before.
 ElevenLabs now offers `eleven_v4` and `eleven_v4_turbo` alongside v3 and the v2.5 models. Mapping CSVs carry a
 `ModelId` column (older files without it still import).
