@@ -472,11 +472,11 @@ async function importVoiceMapCsv() {
 // Voices
 // ==========================================================================
 
-async function refreshAllVoices() {
+async function refreshAllVoices(onlyProviderId) {
   const keys = collectProviderKeysFromForm();
   providerKeys = keys;
 
-  const { voicesByProvider: results, errors } = await call("refreshAllVoices", { providerKeys: keys });
+  const { voicesByProvider: results, errors } = await call("refreshAllVoices", { providerKeys: keys, providerId: onlyProviderId || null });
   // Only providers that answered are replaced: one that failed (bad key, offline) keeps the list it had.
   for (const id in results) voicesByProvider[id] = Array.from(results[id]);
   updateVoiceBadge();
@@ -489,6 +489,7 @@ async function refreshAllVoices() {
     appendLog("Some providers failed to load voices (their previous voice lists were kept):", "error");
     for (const [id, msg] of errorMessages) appendLog(`  ${providerById(id)?.displayName || id}: ${msg}`, "error");
   }
+  return { results, errors };
 }
 
 // ==========================================================================
@@ -510,7 +511,7 @@ function refreshSingleLineDropdowns() {
   const voices = voicesByProvider[providerId] || [];
   voiceSelect.innerHTML = voices.length
     ? voices.map((v) => `<option value="${escapeAttr(v.voiceId)}" data-display="${escapeAttr(v.displayName)}">${escapeHtml(voiceLabel(v.displayName, v.voiceId))}</option>`).join("")
-    : `<option value="">-- load voices on the Voice Mapping page first --</option>`;
+    : `<option value="">${provider && provider.requiresApiKey === false ? "-- make a voice on the Local Voices page --" : "-- click Load voices --"}</option>`;
   if (voices.some((v) => v.voiceId === keepVoice)) voiceSelect.value = keepVoice;
 }
 
@@ -524,10 +525,9 @@ async function generateSingleLine() {
 
   const voiceSelect = document.getElementById("single-voice");
   const voiceId = voiceSelect.value;
-  if (!voiceId) return appendLog(provider.requiresApiKey === false ? "Select a voice first (make one on the Local Voices page)." : "Select a voice first (Get Available Voices).", "error");
+  if (!voiceId) return appendLog(provider.requiresApiKey === false ? "Select a voice first (make one on the Local Voices page)." : "Select a voice first (click Load voices).", "error");
 
-  const outputPath = document.getElementById("single-output-path").value.trim();
-  if (!outputPath) return appendLog("Select an output path first.", "error");
+  const outputPath = document.getElementById("single-output-path").value.trim(); // blank = the default samples folder
 
   const keys = collectProviderKeysFromForm();
   const creds = keys[providerId] || { apiKey: "", groupId: "" };
@@ -544,9 +544,39 @@ async function generateSingleLine() {
       text, outputPath, fileName
     });
     appendLog(`Done: ${result.path}`, "ok");
+    showSingleResult(result);
   } catch (err) {
     appendLog(`Failed: ${err.message}`, "error");
   }
+}
+
+let lastSinglePath = "";
+
+/** Shows the generated line in a player and plays it, so there's no hunting for the file. */
+function showSingleResult(result) {
+  lastSinglePath = result.path;
+  const audio = document.getElementById("single-audio");
+  document.getElementById("single-result").classList.remove("hidden");
+  document.getElementById("single-result-path").textContent = result.path;
+  if (result.audioData) {
+    audio.src = "data:audio/wav;base64," + result.audioData;
+    audio.play().catch(() => { /* autoplay can be blocked; the controls still work */ });
+  } else {
+    audio.removeAttribute("src");
+    appendLog("The file is too large to preview here; open it from its folder.", "error");
+  }
+  document.getElementById("single-result").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+/** "Load voices" on Single Line: fetch just the selected provider's voices (local providers just re-list theirs). */
+async function loadSingleLineVoices() {
+  const providerId = document.getElementById("single-provider").value;
+  const provider = providerById(providerId);
+  if (!provider) return;
+  appendLog(`Loading ${provider.displayName} voices...`);
+  const { results, errors } = await refreshAllVoices(providerId);
+  if (errors[providerId]) return;
+  appendLog(`${provider.displayName}: ${(results[providerId] || []).length} voice(s) available.`, "ok");
 }
 
 // ==========================================================================
@@ -759,6 +789,16 @@ function wireStaticHandlers() {
   document.getElementById("import-csv-btn").addEventListener("click", importVoiceMapCsv);
 
   document.getElementById("single-provider").addEventListener("change", refreshSingleLineDropdowns);
+  document.getElementById("single-load-voices-btn").addEventListener("click", () => withButtonBusy("single-load-voices-btn", loadSingleLineVoices));
+  document.getElementById("single-play-btn").addEventListener("click", () => {
+    const audio = document.getElementById("single-audio");
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  });
+  document.getElementById("single-show-btn").addEventListener("click", async () => {
+    const r = await call("showInFolder", { path: lastSinglePath });
+    if (!r.ok) appendLog(`Could not open the folder: ${r.error}`, "error");
+  });
   document.getElementById("generate-single-btn").addEventListener("click", () =>
     withButtonBusy("generate-single-btn", generateSingleLine));
 

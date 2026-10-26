@@ -32,6 +32,11 @@ The biggest update so far: VoiceForge can now read your mod's dialogue straight 
 - It works for every provider, so you can also choose per voice, for example OmniVoice 32 or 16 steps.
 - Mapping CSV export/import carries the model as a new `ModelId` column. Older mapping files still import.
 
+**Single Line: listen right away**
+- The generated line now **plays automatically** in a player on the page (with Play again), and **Show in folder** opens Explorer on the saved file, so there's no hunting for it.
+- **Load voices** button on the page fetches the selected provider's voices; you no longer have to go to Voice Mapping first. It tells you if the provider has no key saved.
+- The output folder is optional now: leave it blank and test lines go to `Documents\VoiceForgeAIO\Samples`.
+
 **New look**
 - The interface now matches StoryLoom: dark panels with an amber accent, serif page titles, rounded cards and a collapsible sidebar.
 - Settings is now a page rather than a pop-up, and each API key shows whether one is entered.
@@ -67,7 +72,7 @@ The biggest update so far: VoiceForge can now read your mod's dialogue straight 
 ### For builders
 - New requirement for building: the Mutagen package (restored automatically).
 - Fixed invalid XML in `FolderProfile.pubxml` that stopped `dotnet publish` from loading it.
-- Added `tests/e2e`: end-to-end tests that drive the real backend and UI against generated plugins and fake providers (87 checks). See its README.
+- Added `tests/e2e`: end-to-end tests that drive the real backend and UI against generated plugins and fake providers (96 checks). See its README.
 
 ### Known limits
 - Only Skyrim Special Edition plugins are read.

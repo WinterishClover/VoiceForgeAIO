@@ -85,6 +85,21 @@ const csvRun = async (p, name, content, conc) => { const csv = path.join(h.OUT, 
   await p.click('[data-page="single-line-page"]'); await p.selectOption('#single-provider', 'Fake'); await p.selectOption('#single-model', 'fake-2');
   await p.click('[data-page="local-voices-page"]'); await p.click('#qwenNewButton'); await p.fill('#qwenVoiceName', 'Tmp'); await p.fill('#qwenVoiceInstruct', 'x'); await p.click('#qwenVoiceSaveButton'); await T(500);
   await p.click('[data-page="single-line-page"]'); check('Single-Line model survives a voice list change', (await p.inputValue('#single-model')) === 'fake-2');
+  // Single Line: load voices there, play the result
+  await p.click('[data-page="single-line-page"]');
+  await p.selectOption('#single-provider', 'Inworld'); await p.click('#single-load-voices-btn'); await T(600);
+  check('Load voices on Single Line explains a missing key', (await h.logText(p)).some(l => /No API key saved for Inworld/.test(l)));
+  await p.selectOption('#single-provider', 'Fake'); await p.click('#single-load-voices-btn'); await T(800);
+  check('Load voices fetches the selected provider', (await h.logText(p)).some(l => /Fake Cloud: 2 voice\(s\) available/.test(l)));
+  check('...and fills the voice list', (await p.$$eval('#single-voice option', o => o.map(x => x.value))).includes('f1'));
+  await p.selectOption('#single-voice', 'f1'); await p.fill('#single-text', 'Play me'); await p.fill('#single-output-path', ''); await p.fill('#single-filename', 'playcheck');
+  await p.click('#generate-single-btn'); await T(1200);
+  check('result card appears with a player holding the audio', await p.isVisible('#single-result') && (await p.$eval('#single-audio', a => a.src)).startsWith('data:audio/wav;base64,'));
+  const shown = await p.textContent('#single-result-path');
+  check('a blank output folder saves to Documents\\VoiceForgeAIO\\Samples', /VoiceForgeAIO[\\/]Samples[\\/]playcheck\.wav$/.test(shown) && fs.existsSync(shown), shown);
+  check('the player can load the audio (a real WAV)', await p.$eval('#single-audio', a => new Promise(res => { if (a.readyState >= 1) return res(a.duration > 0); a.addEventListener('loadedmetadata', () => res(a.duration > 0)); a.addEventListener('error', () => res(false)); setTimeout(() => res(false), 3000); })));
+  await p.click('#single-play-btn'); await p.click('#single-show-btn'); await T(400);
+  check('Show in folder fails gracefully where Explorer does not exist', p.errs.length === 0, JSON.stringify(p.errs));
   // Models: the Model column reaches Generate (all functions, not just Single Line)
   await p.click('[data-page="voice-mapping-page"]');
   const kayRow = (await p.$$('#voice-map-body tr'))[(await h.rows(p)).findIndex(x => x.type === 'Kaylin')];

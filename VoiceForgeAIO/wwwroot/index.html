@@ -197,13 +197,25 @@
                 <label class="field"><span>Provider</span><select id="single-provider"></select></label>
                 <label class="field"><span>Model</span><select id="single-model"></select></label>
               </div>
-              <label class="field"><span>Voice</span><select id="single-voice"></select></label>
-              <label class="field"><span>Output folder</span>
+              <label class="field"><span>Voice</span>
+                <div class="path-control"><select id="single-voice"></select><button class="secondary" id="single-load-voices-btn" type="button" title="Fetch this provider's voices">Load voices</button></div>
+              </label>
+              <label class="field"><span>Output folder <em class="optional">optional &mdash; blank saves to Documents\VoiceForgeAIO\Samples</em></span>
                 <div class="path-control"><input type="text" id="single-output-path" /><button class="secondary" type="button" data-browse-folder="single-output-path">Browse&hellip;</button></div>
               </label>
               <label class="field"><span>File name</span>
                 <div class="path-control"><input type="text" id="single-filename" placeholder="line1.wav" /><button id="generate-single-btn" type="button">Generate audio</button></div>
               </label>
+            </div>
+          </section>
+
+          <section class="settings-card narrow hidden" id="single-result">
+            <div class="settings-heading"><span class="section-label">RESULT</span><h3>Listen</h3></div>
+            <audio id="single-audio" controls preload="auto"></audio>
+            <div class="result-path" id="single-result-path"></div>
+            <div class="button-bar">
+              <button class="secondary" id="single-play-btn" type="button">Play again</button>
+              <button class="secondary" id="single-show-btn" type="button">Show in folder</button>
             </div>
           </section>
         </section>
@@ -530,8 +542,10 @@
 
         <h4>3. Try a line with Single Line</h4>
         <p>Good for quickly testing a voice before committing to a full batch.
-          Pick a provider, model, and voice, type some text, choose where to save
-          it, and click <strong>Generate Audio</strong>.</p>
+          Pick a provider, click <strong>Load voices</strong> to fetch its voices, choose a
+          model and voice, type some text and click <strong>Generate audio</strong>. The result
+          plays right away and appears in a player below; <strong>Show in folder</strong> opens
+          where it was saved (<code>Documents\VoiceForgeAIO\Samples</code> unless you chose a folder).</p>
 
         <h4>4. Run a full batch</h4>
         <p>Your CSV needs exactly three columns, no header row:</p>

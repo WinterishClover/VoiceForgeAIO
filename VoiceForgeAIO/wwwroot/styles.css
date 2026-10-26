@@ -175,7 +175,7 @@ select[size] option { padding: 7px 10px; border-radius: 6px; }
 select[size] option:checked { background: rgba(200, 141, 82, 0.28) linear-gradient(0deg, rgba(200, 141, 82, 0.28), rgba(200, 141, 82, 0.28)); color: var(--text); }
 
 .path-control { display: flex; gap: 10px; align-items: center; min-width: 0; }
-.path-control > input { flex: 1 1 auto; min-width: 0; }
+.path-control > input, .path-control > select { flex: 1 1 auto; min-width: 0; }
 .path-control > button { flex: none; }
 
 /* older row-style layout, still produced by the JS-built rows and the Local Voices cards */
@@ -343,3 +343,6 @@ table.grid td input[type="checkbox"] { margin: 0 auto; display: block; }
 
 .path-control + .table-wrap { margin-top: 14px; }
 .settings-card > .path-control + .field-hint { margin-top: 10px; }
+
+audio { width: 100%; height: 44px; border-radius: 8px; }
+.result-path { margin-top: 12px; color: var(--muted); font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }

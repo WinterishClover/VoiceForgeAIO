@@ -72,6 +72,7 @@ internal sealed class ApiBridge
         "stopBatch" => Task.FromResult<object?>(StopBatch()),
         "markSplashSeen" => Task.FromResult<object?>(MarkSplashSeen()),
         "openExternalUrl" => Task.FromResult<object?>(OpenExternalUrl(args)),
+        "showInFolder" => Task.FromResult<object?>(ShowInFolder(args)),
         "detectDataFolder" => Task.FromResult<object?>(DetectDataFolder()),
         "listPlugins" => Task.FromResult<object?>(ListPlugins(args)),
         "readPlugin" => ReadPluginAsync(args),
@@ -246,7 +247,12 @@ internal sealed class ApiBridge
     // Voices
     // ------------------------------------------------------------------
 
-    private sealed class RefreshVoicesRequest { public Dictionary<string, ProviderKeyPair> ProviderKeys { get; set; } = new(); }
+    private sealed class RefreshVoicesRequest
+    {
+        public Dictionary<string, ProviderKeyPair> ProviderKeys { get; set; } = new();
+        /// <summary>When set, only this provider's voices are fetched (Single Line's "Load voices"); otherwise every provider with a key.</summary>
+        public string? ProviderId { get; set; }
+    }
 
     private async Task<object?> RefreshAllVoicesAsync(JsonElement args)
     {
@@ -257,11 +263,18 @@ internal sealed class ApiBridge
 
         foreach (var provider in TtsProviderRegistry.All)
         {
+            bool asked = !string.IsNullOrWhiteSpace(req.ProviderId);
+            if (asked && !provider.Id.Equals(req.ProviderId, StringComparison.OrdinalIgnoreCase)) continue;
+
             // Local providers have no key; their voices are the ones made on the Local Voices page.
             req.ProviderKeys.TryGetValue(provider.Id, out var pair);
             pair ??= new ProviderKeyPair();
             if (provider.RequiresApiKey && string.IsNullOrWhiteSpace(pair.ApiKey))
+            {
+                // Skipped quietly when refreshing everything; an explicit request says why nothing came back.
+                if (asked) errors[provider.Id] = $"No API key saved for {provider.DisplayName}. Add it on the Settings page first.";
                 continue;
+            }
 
             try
             {
@@ -510,16 +523,36 @@ internal sealed class ApiBridge
         if (!TtsProviderRegistry.TryGet(req.ProviderId, out var provider))
             throw new InvalidOperationException($"Unknown provider '{req.ProviderId}'.");
 
-        string fileName = string.IsNullOrWhiteSpace(req.FileName) ? "line1.wav" : req.FileName;
+        string fileName = string.IsNullOrWhiteSpace(req.FileName) ? "line1.wav" : req.FileName.Trim();
         if (!Path.HasExtension(fileName)) fileName += ".wav";
-        string outPath = Path.Combine(req.OutputPath, fileName);
+        // No folder chosen: quick tests go to Documents\VoiceForgeAIO\Samples instead of needing a folder first.
+        string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        if (string.IsNullOrEmpty(documents)) documents = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        string folder = string.IsNullOrWhiteSpace(req.OutputPath)
+            ? Path.Combine(documents, "VoiceForgeAIO", "Samples")
+            : req.OutputPath.Trim();
+        string outPath = Path.Combine(folder, Path.GetFileName(fileName));
 
         var creds = new ProviderCredentials { ApiKey = req.ApiKey, GroupId = req.GroupId };
-        byte[] audio = await provider.SynthesizeAsync(creds, req.Text, req.VoiceId, req.ModelId);
-        Directory.CreateDirectory(req.OutputPath);
-        await File.WriteAllBytesAsync(outPath, WavHeaderFixup.NormalizeHeader(audio));
+        byte[] audio = WavHeaderFixup.NormalizeHeader(await provider.SynthesizeAsync(creds, req.Text, req.VoiceId, req.ModelId));
+        Directory.CreateDirectory(folder);
+        await File.WriteAllBytesAsync(outPath, audio);
 
-        return new { ok = true, path = outPath };
+        // The audio comes back too, so the page can play it without the user hunting for the file.
+        return new { ok = true, path = outPath, folder, bytes = audio.Length, audioData = audio.Length <= 30_000_000 ? Convert.ToBase64String(audio) : null };
+    }
+
+    /// <summary>Opens Explorer with the file selected (Windows).</summary>
+    private object ShowInFolder(JsonElement args)
+    {
+        string path = args.GetProperty("path").GetString() ?? "";
+        if (!File.Exists(path)) return new { ok = false, error = "That file no longer exists." };
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true });
+            return new { ok = true };
+        }
+        catch (Exception ex) { return new { ok = false, error = ex.Message }; }
     }
 
     // ------------------------------------------------------------------
